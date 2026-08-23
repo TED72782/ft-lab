@@ -541,6 +541,26 @@ setTimeout(()=>{
     tailIds.every(i => CC.find(x=>x.i===i).me)
       ? "yes (the four dashed complaints are last)"
       : "FAIL — the tail is " + tailIds.map(i=>CC.find(x=>x.i===i).n).join(", "));
+  /* the third ordering: fewest tests first. `w` is measured on EVERY arrival, unlike `dd`, so
+     nothing sinks here — and a check that it does not, because sinking would hide exactly the
+     test-heavy complaints this ordering exists to surface. */
+  S.ccSort="test"; run();
+  const idsByTest = [...document.getElementById("ccList").innerHTML.matchAll(/data-cc="(\d+)"/g)]
+      .map(m=>Number(m[1]));
+  const wSeq = idsByTest.map(i => CC.find(x=>x.i===i).w);
+  const sortedAsc = wSeq.every((v,k) => k===0 || wSeq[k-1] <= v + 1e-9);
+  const heaviest = CC.find(x=>x.i===idsByTest[idsByTest.length-1]);
+  console.log("fewest tests first, no sinking:", sortedAsc && heaviest.w > 0.9
+    ? "yes (" + (100*wSeq[0]).toFixed(0) + "% up to " + heaviest.n + " at "
+      + (100*heaviest.w).toFixed(0) + "%)"
+    : "FAIL — ascending " + sortedAsc + ", last is " + heaviest.n
+      + " at " + (100*heaviest.w).toFixed(0) + "%");
+  // ⚠ both sides numeric: idsByVol holds strings from the regex, so a bare .sort() is
+  //   lexicographic ("10" before "2") and the comparison fails on ordering, not on content
+  const sameAsVol = idsByTest.slice().sort((a,b)=>a-b).join()
+                 === idsByVol.map(Number).sort((a,b)=>a-b).join();
+  console.log("test order keeps the same set:", sameAsVol ? "yes" : "FAIL — the set changed");
+
   S.ccSort = "vol";
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);

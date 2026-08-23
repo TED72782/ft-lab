@@ -1534,8 +1534,15 @@ function drawCriteria(){
      Estimated entries go LAST when sorting by speed, whatever their number: their figure is the
      lane-wide fallback rather than a measurement, and ranking them among measured ones would
      invite exactly the comparison the dash exists to prevent. */
+  /* ⚠ the estimate rule applies to `fast` ONLY. `dd` is measured on the no-test group, which four
+     complaints barely have — but the TEST RATE is measured on every arrival, so it is real for all
+     26 and nothing needs sinking. Sinking them here would hide the very complaints a
+     fewest-tests ordering is meant to surface: ankle 99% and dysuria 98% belong at the bottom
+     because they are test-heavy, not because their figure is soft. */
   const order = S.ccSort === "fast"
-    ? CC.slice().sort((p, q) => (p.me ? 1 : 0) - (q.me ? 1 : 0) || p.dd - q.dd)
+      ? CC.slice().sort((p, q) => (p.me ? 1 : 0) - (q.me ? 1 : 0) || p.dd - q.dd)
+    : S.ccSort === "test"
+      ? CC.slice().sort((p, q) => p.w - q.w || p.dd - q.dd)
     : CC;
   $("ccList").innerHTML = order.map(x=>{
     const on = PICK.has(x.i), bed = BEDPICK.has(x.i);
