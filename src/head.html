@@ -66,6 +66,7 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .opt .t{font-weight:600;font-size:14px}
 .opt .s{font-size:12.5px;color:var(--ink-2)}
 #presets button{background:var(--surface)}
+#presets button[aria-pressed="true"]{border-color:var(--hold);background:var(--hold-wash)}
 .strm{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;
   background:var(--surface)}
 .strm-h{font-size:13px;font-weight:600;margin-bottom:8px}
@@ -97,6 +98,9 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .tabs button:focus-visible{outline:2px solid var(--hold);outline-offset:2px}
 #tabNotes{max-width:760px}
 #tabNotes h3{margin:22px 0 8px}
+#tabNotes h2{font-size:15px;letter-spacing:.02em;margin:0 0 12px;color:var(--ink-2);
+  text-transform:uppercase}
+#tabNotes:focus-visible,#tabLab:focus-visible{outline:none}
 .seg{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .seg-l{font-size:12.5px;color:var(--ink-2)}
 .seg button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;

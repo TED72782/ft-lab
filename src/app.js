@@ -473,7 +473,7 @@ function drawStage(){
   $("stageSent").textContent = st.sent;
   $("stageBar").style.width = (100*PLAY.t/(S.len*60)).toFixed(1) + "%";
   const busy = PLAY.n > PLAY.expect*1.15 ? "a busy one" : PLAY.n < PLAY.expect*0.85 ? "a quiet one" : "a typical one";
-  $("stageHint").innerHTML = `This evening brought <b class="num">${PLAY.n}</b> patients into the lane
+  $("stageHint").innerHTML = `This run brought <b class="num">${PLAY.n}</b> patients into the lane
     against a typical <b class="num">${PLAY.expect.toFixed(1)}</b> — ${busy}.` + (m.id==="split"
       ? ` A space outlined in red holds a patient with nowhere to move on to.`
       : m.id==="bedfirst"
@@ -497,7 +497,7 @@ function playPause(on){
     if(!PLAY.trace || PLAY.t >= S.len*60){ buildTrace(); PLAY.t = 0 }
     PLAY.last = 0; PLAY.raf = requestAnimationFrame(tick);
   } else cancelAnimationFrame(PLAY.raf);
-  $("playBtn").textContent = PLAY.on ? "Pause" : (PLAY.t>0 ? "Resume" : "Play the evening");
+  $("playBtn").textContent = PLAY.on ? "Pause" : (PLAY.t>0 ? "Resume" : "Play the day");
   $("reroll").hidden = !PLAY.trace;
 }
 
@@ -776,6 +776,7 @@ const bedShareDisplay = (drawn, grp) => {
 };
 
 // Named layouts the group has put forward. Each is a full setting, not a hint.
+let ACTIVE_PRESET = null;   // which named layout is loaded, so the row can show it
 const PRESETS = [
   {id:"mikelong", n:"The Mike Long Play",
    set:{mode:"split", A:2, R:8, assess:44, fastDischarge:true},
@@ -785,7 +786,7 @@ const PRESETS = [
    d:"5 spaces in total, split between assessment and results-pending however you like — move one and the other follows."},
   {id:"rooms", n:"8 rooms + 10 chairs",
    set:{mode:"split", A:8, R:10, fastDischarge:true, roomsA:true},
-   d:"The larger estate: assessment in a room, then a second area of 10 chairs."},
+   d:"The bigger footprint: assessment in a room, then a second area of 10 chairs."},
   /* Blake's proposal, on the SAME ten spaces as the 6+4 split and the 10 pooled, so the only
      thing that differs between the three is the rule for who goes where. */
   {id:"blake", n:"The Blake",
@@ -794,6 +795,9 @@ const PRESETS = [
    // without his rule. The exclusion list itself is restored by the preset handler below.
    set:{mode:"bedfirst", A:6, R:4, bedIntp:true},
    d:"6 rooms, 4 overflow chairs. A room is the default; chairs are used only once the rooms are full, and the bed-required list never goes vertical."},
+  {id:"sorted", n:"Sorted at the door",
+   set:{mode:"stream", A:3, R:7, bedIntp:true, bedGrp:true},
+   d:"3 rooms and 7 chairs, kept apart: a patient is sent to one side at the door and neither side lends to the other."},
   {id:"six", n:"Group consensus — 6, split",
    set:{mode:"split", A:4, R:2, budget:6},
    d:"6 spaces, divided. Which split is best depends entirely on the assessment time — move that slider and watch the best split move with it."}
@@ -852,10 +856,18 @@ function drawModes(){
     `<button type="button" data-m="${m.id}" aria-pressed="${m.id===S.mode}">
        <span class="t">${m.t}</span><br><span class="s">${m.s}</span></button>`).join("");
   $("modes").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    /* ⚠ THE ESTATE IS PRESERVED ACROSS A LAYOUT CHANGE. This folded R into A on the way into
+       pooled and never cleared R, so clicking through the four layouts ratcheted the lane
+       upward — 6+4 became 10, then 10+4, then 12+4 — and the later ones scored better simply for
+       having more spaces. The whole page is "the same ten spaces, different rule"; a physician
+       comparing by clicking the buttons was comparing 10 against 14. */
+    ACTIVE_PRESET = null;                 // a hand-picked layout is no longer a named one
+    const held = S.A + (modeOf().hasR ? S.R : 0);
     S.mode=b.dataset.m; S.budget=0; const m=modeOf();
-  if(m.id==="pooled"){S.A=Math.min(12,S.A+S.R)}
+    if(!m.hasR){ S.A = Math.min(LIM.A[1], held); S.R = 0 }
+    else if(!S.R){ S.A = Math.max(1, held - Math.round(held*0.4)); S.R = held - S.A }
     if(m.id==="split" && S.A+S.R>16){S.A=6;S.R=4}
-    drawModes();drawSpaces();run();
+    drawModes();drawSpaces();drawPresets();run();
   });
 }
 
@@ -871,6 +883,7 @@ function syncSpaces(){
 }
 
 function drawSpaces(){
+  /* a named layout stops being loaded the moment the lane is edited by hand */
   const m=modeOf(), rows=[];
   rows.push(ctl("A", m.id==="pooled" ? "Spaces in the group"
                   : m.id==="bedfirst" ? "ED rooms the lane can use"
@@ -893,6 +906,7 @@ function drawSpaces(){
     S.roomsA = b.dataset.ra === "1"; drawSpaces(); run() });
   $("spaceCtl").querySelectorAll("input").forEach(i=>{
     i.oninput=()=>{
+      ACTIVE_PRESET = null;
       const k=i.dataset.k, v=+i.value;
       if(S.budget && m.hasR){                       // spend from a fixed pot: one goes up, the other down
         const other = k==="A" ? "R" : "A";
@@ -1082,10 +1096,11 @@ function syncSpeed(m){
 
 function drawPresets(){
   $("presets").innerHTML = PRESETS.map(p=>
-    `<button type="button" data-p="${p.id}"><span class="t">${p.n}</span><br>
+    `<button type="button" data-p="${p.id}" aria-pressed="${ACTIVE_PRESET === p.id}"
+       ><span class="t">${p.n}</span><br>
        <span class="s">${p.d}</span></button>`).join("");
-  $("presets").querySelectorAll("button").forEach(btn=>btn.onclick=()=>{
-    const p=PRESETS.find(x=>x.id===btn.dataset.p);
+  $("presets").querySelectorAll("[data-p]").forEach(btn=>btn.onclick=()=>{
+    const p=PRESETS.find(x=>x.id===btn.dataset.p); ACTIVE_PRESET = p.id;
     S.budget=0; Object.assign(S,p.set);
     // BEDPICK lives outside S, so Object.assign cannot carry it — the same class of bug the
     // board-row loader has hit twice. A preset is a full setting, so it resets the list too.
@@ -1273,8 +1288,8 @@ function drawBoard(){
     // r.cfg is the SANITISED cfg scoreOf ran — a legacy 'zone' row must not print a shape its
     // own score was never computed from
     const shape = r.cfg.mode==="pooled" ? `${r.cfg.A} pooled`
-                : r.cfg.mode==="bedfirst" ? `${r.cfg.A} rm + ${r.cfg.R} ch`
-                : r.cfg.mode==="stream" ? `${r.cfg.A} bed + ${r.cfg.R} ch`
+                : r.cfg.mode==="bedfirst" ? `${r.cfg.A} rooms + ${r.cfg.R} chairs`
+                : r.cfg.mode==="stream" ? `${r.cfg.A} rooms + ${r.cfg.R} chairs, apart`
                 : `${r.cfg.A}+${r.cfg.R}`;
     const big = r.spaces > most;
     return `<tr><td class="num">${i+1}</td><td>${r.who}</td>
@@ -1485,7 +1500,7 @@ function drawBedList(){
     ? sel.filter(x=>!BEDPICK.has(x.i)).reduce((a,x)=>a + x.s*(x.x!=null?x.x:D.g.interp), 0)/tot : 0;
   $("bedSum").innerHTML = `<b class="num">${Math.round(100*eff)}%</b> of the patients this lane
     accepts must have a room &mdash; <b class="num">${Math.round(100*ccPart)}%</b> from the
-    ${bedTicked} complaint${bedTicked===1?"":"s"} ticked on the list${S.bedIntp
+    ${bedTicked === 1 ? "one" : bedTicked} complaint${bedTicked===1?"":"s"} marked on the list${S.bedIntp
       ? `, <b class="num">${Math.round(100*intpPart)}%</b> needing an interpreter` : ``}${S.bedGrp
       ? `, <b class="num">${Math.round(100*(eff-drawn))}%</b> arriving with a sibling` : ``}, plus
     <b class="num">${S.bedExtra}%</b> of everyone else.
@@ -1707,11 +1722,12 @@ function run(){
     $("load").className = "load" + (rho>=1 ? " bad" : rho>0.85 ? " warn" : "");
     const busy = rho * bind.spaces;
     $("load").innerHTML = rho >= 1
-      ? `<b>Too many patients for the ${bind.thing}.</b> Across the whole shift they can get
+      ? `<b>Too many patients for the ${bind.thing}.</b> While the lane is open they can get
          through about <b class="num">${bind.cap.toFixed(0)}</b> patients, and
          <b class="num">${bind.coming.toFixed(0)}</b> are coming. The queue never catches up, so
          people are still waiting when it closes.`
-      : `<b>The ${bind.thing} are the tight spot.</b> On average
+      : `<b>${rho > 0.85 ? `The ${bind.thing} are the tight spot.`
+                         : `The ${bind.thing} fill up first.`}</b> On average
          <b class="num">${busy.toFixed(1)}</b> of your <b class="num">${bind.spaces}</b> are in use.
          That is not <b class="num">${(bind.spaces-busy).toFixed(1)}</b> going spare — patients
          arrive in clusters, so people start waiting well before every one is taken.`;
@@ -1797,7 +1813,8 @@ function run(){
   // the numbers describe another is worse than no stage
   if(PLAY.trace){ PLAY.trace = null; PLAY.runs = null; PLAY.pick = 0; playPause(false); PLAY.t = 0; }
   if(!PLAY.trace){ drawStageIdle(); $("reroll").hidden = true;
-    $("stageHint").textContent = "The same run the numbers come from — one seeded evening, replayed "
+    if(PLAY.expect < 0.05){ $("stageHint").textContent = "Nothing is selected, so nobody arrives."; }
+  else $("stageHint").textContent = "The same run the numbers come from — one recorded day, replayed "
       + "on a clock. A space that looks full is full."; }
   // keep the query string — it carries ?board=, and replacing the URL with a bare hash would
   // drop the shared board from the address bar on the first render

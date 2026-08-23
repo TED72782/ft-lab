@@ -24,26 +24,34 @@ const mk=id=>({id,_h:"",_t:"",value:"",hidden:false,style:{},dataset:{},_kids:[]
      every click, and nothing noticed for a day). Parse the buttons out of the markup and hand
      back objects the page can attach to and a test can click. */
   querySelectorAll(sel){
-    const want = (sel.match(/\[([a-zA-Z-]+)(?:=)?/)||[])[1];
-    const out = [];
-    const re = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
-    let m;
-    while((m = re.exec(this._h))){
-      const attrs = m[1], inner = m[2];
-      const data = {};
-      let a; const ar = /data-([a-zA-Z-]+)="([^"]*)"/g;
-      while((a = ar.exec(attrs))) data[a[1].replace(/-([a-z])/g, (_,c)=>c.toUpperCase())] = a[2];
-      if(want && want !== "button" && !(want.replace(/^data-/, "").replace(/-([a-z])/g,(_,c)=>c.toUpperCase()) in data)
-         && attrs.indexOf(want) < 0) continue;
-      const el = {dataset:data, disabled:/\bdisabled\b/.test(attrs), _attr:{},
-        innerHTML:inner, textContent:inner.replace(/<[^>]*>/g,""),
-        getAttribute(k){ const g=new RegExp(k+'="([^"]*)"').exec(attrs); 
-                         return k in this._attr ? this._attr[k] : (g?g[1]:null) },
-        setAttribute(k,v){ this._attr[k]=String(v) }, onclick:null, oninput:null,
-        querySelectorAll:()=>[] };
-      out.push(el);
+    /* ⚠ ONE SET OF OBJECTS PER MARKUP, FILTERED PER SELECTOR. The page wires handlers onto what IT
+       gets back and a test clicks what IT gets back; if those differ the handler is never reached
+       and the check passes having done nothing. Caching per SELECTOR was not enough — the page
+       asks for "button" and a test asks for "[data-m]", which are different keys over the same
+       buttons. Parse once, filter after. That is exactly how the estate-growing bug survived a
+       guard written to catch it. */
+    if(this._qsFor !== this._h){
+      this._qsFor = this._h;
+      this._qsAll = [];
+      const re = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
+      let m;
+      while((m = re.exec(this._h))){
+        const attrs = m[1], inner = m[2], data = {};
+        let a; const ar = /data-([a-zA-Z-]+)="([^"]*)"/g;
+        while((a = ar.exec(attrs))) data[a[1].replace(/-([a-z])/g, (_,c)=>c.toUpperCase())] = a[2];
+        this._qsAll.push({dataset:data, _attrs:attrs, _set:{},
+          disabled:/\bdisabled\b/.test(attrs), innerHTML:inner,
+          textContent:inner.replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim(),
+          getAttribute(k){ if(k in this._set) return this._set[k];
+                           const g=new RegExp(k+'="([^"]*)"').exec(this._attrs); return g?g[1]:null },
+          setAttribute(k,v){ this._set[k]=String(v) },
+          onclick:null, oninput:null, querySelectorAll:()=>[] });
+      }
     }
-    return out;
+    const want = (sel.match(/\[data-([a-zA-Z-]+)/)||[])[1];
+    if(!want) return this._qsAll;
+    const key = want.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
+    return this._qsAll.filter(el => key in el.dataset);
   },
   insertAdjacentHTML(v, html){ this._h += String(html); this._parse() }, focus(){}});
 /* ⚠ A CONTROL MISSING FROM THIS SET IS INVISIBLE TO THE HARNESS AND NEVER RENDERS.

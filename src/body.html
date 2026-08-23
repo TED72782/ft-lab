@@ -2,20 +2,20 @@
 <header>
   <div class="eyebrow">Mary Bridge ED · fast-track lane · hours you choose</div>
   <h1>Fast Track Chair Lab</h1>
-  <p>Build a lane, run the evening, put it on the board. Every setting simulates 2,400 evenings
+  <p>Build a lane, run the day, put it on the board. Every setting simulates {{runs}} days
      on service times measured from our own department, and a board entry is scored on the same
-     2,400 &mdash; the page and the leaderboard cannot disagree about a lane. There is no pass
+     {{runs}} &mdash; the page and the leaderboard cannot disagree about a lane. There is no pass
      mark here — the page
      reports <b>how long people wait and how many get turned away</b>, and what counts as
      acceptable is yours to argue about.</p>
 </header>
 
 <nav class="tabs" role="tablist">
-  <button type="button" id="tabLabBtn"   role="tab" aria-selected="true">The lab</button>
-  <button type="button" id="tabNotesBtn" role="tab" aria-selected="false">Notes &amp; method</button>
+  <button type="button" id="tabLabBtn"   role="tab" aria-selected="true" aria-controls="tabLab">The lab</button>
+  <button type="button" id="tabNotesBtn" role="tab" aria-selected="false" aria-controls="tabNotes">Notes &amp; method</button>
 </nav>
 
-<div id="tabLab">
+<div id="tabLab" role="tabpanel" tabindex="0" aria-labelledby="tabLabBtn">
 <div class="layout">
   <!-- ── controls ─────────────────────────────────────────── -->
   <div>
@@ -41,7 +41,9 @@
       <div class="panel-b">
         <div id="speedCtl"></div>
         <div id="turnCtl"></div>
-        <div class="crit-hint">A space is not free the moment a patient walks out of it. The chair figure applies wherever a chair is used; only a rooms layout has rooms to turn over. <span class="dim">Why, and what it costs, in <b>Notes &amp; method</b>.</span></div>
+        <div class="crit-hint">A space is not free the moment a patient walks out of it. The chair
+        figure applies wherever a chair is used; only a layout with rooms has rooms to turn over.
+        <span class="dim">What it costs, in <b>Notes &amp; method</b>.</span></div>
       </div>
     </section>
 
@@ -68,9 +70,9 @@
 
     <section class="panel stage" style="margin-top:14px">
       <div class="stage-h">
-        <div><div class="eyebrow">One evening, played out</div>
+        <div><div class="eyebrow">One day, played out</div>
           <div class="stage-sub" id="stageHint">The same run the numbers come from — one seeded
-            evening, replayed on a clock. A space that looks full is full.</div></div>
+            day, replayed on a clock. A space that looks full is full.</div></div>
         <div class="stage-ctl">
           <span class="clock num" id="stageClock">--:--</span>
           <select id="speedSel" aria-label="playback speed">
@@ -79,8 +81,8 @@
             <option value="120">fast</option>
             <option value="300">very fast</option>
           </select>
-          <button type="button" id="reroll" hidden>Another evening</button>
-          <button type="button" id="playBtn" class="primary">Play the evening</button>
+          <button type="button" id="reroll" hidden>Another day</button>
+          <button type="button" id="playBtn" class="primary">Play the day</button>
         </div>
       </div>
       <div class="stage-bar"><span id="stageBar"></span></div>
@@ -138,7 +140,7 @@
       <div class="crit-f">Complaints as triage records them, grouped so <i>Febrile</i> and <i>Fever</i> are one. <span class="dim">Full definitions in <b>Notes &amp; method</b>.</span></div>
     </section>
 
-    <!-- Blake's exclusion list. Hidden in the layouts that have no chairs to be excluded from. -->
+    <!-- Non-complaint routing rules. Shown only in the layouts that have rooms. -->
     <section class="panel crit" id="bedPanel" hidden>
       <div class="crit-h">
         <div><div class="eyebrow">Who needs a bed &mdash; beyond the complaints</div>
@@ -159,7 +161,7 @@
           see, and what is deliberately absent &mdash; is in <b>Notes &amp; method</b> at the top.</p>
         <div id="bedExtraCtl"></div>
       </div>
-      <div class="crit-f">The parts add up, and the total above is what the simulation uses.</div>
+      <div class="crit-f">The parts add up, and the total above is what the page runs.</div>
     </section>
 
     <section class="panel board">
@@ -175,7 +177,7 @@
       <div class="board-scroll">
         <table class="board-t">
           <thead><tr><th>#</th><th>who</th><th>lane</th>
-            <th>spaces</th><th>hours</th><th>score<br>min/patient</th><th>of the<br>day</th><th>worst<br>hour</th><th>still waiting<br>at close</th><th></th></tr></thead>
+            <th>spaces</th><th>hours</th><th>score<br>min/patient</th><th>share of<br>the day</th><th>worst<br>hour</th><th>still waiting<br>at close</th><th></th></tr></thead>
           <tbody id="boardBody"></tbody>
         </table>
       </div>
@@ -197,7 +199,7 @@
       <input id="apiUrl" type="url" placeholder="https://script.google.com/…/exec"
              aria-label="shared board endpoint">
       <button type="button" id="apiSave" class="primary">Save</button>
-      <p>Paste the web-app URL from SETUP-SHARED-BOARD.md. Only one person needs to do this —
+      <p>Paste the web-app address your board was set up with. Only one person needs to do this —
          once it is set, <b>Copy link to this setup</b> produces a link that joins everyone else
          to the same board automatically. Leave it empty to return to the group's shared board,
          which this page uses by default.</p>
@@ -207,16 +209,19 @@
 </div>
 </div><!-- /tabLab -->
 
-<div id="tabNotes" hidden>
+<div id="tabNotes" role="tabpanel" tabindex="0"
+     aria-labelledby="tabNotesBtn" hidden>
+    <h2>Notes &amp; method</h2>
     <div class="note">
       <h3>Turnover</h3>
-      <div class="crit-hint">A space is not free the moment a patient walks out of it. Until
-          2026-08-22 this page assumed it was, which quietly handed every layout back capacity it
-          does not have &mdash; and handed the most to the fastest layouts, because they turn their
-          spaces over most often. <b>The chair figure applies wherever a chair is used</b>, which is
-          both sides of a divided lane and the whole of the pooled one. The rooms-first layout has
-          rooms by definition, and a divided lane can say its assessment side is rooms &mdash; the
-          control under Spaces &mdash; which is what <i>8 rooms + 10 chairs</i> does. Set both to zero to see the old behaviour.</div>
+      <div class="crit-hint">A space is not free the moment a patient walks out of it, and the
+        lane is charged for turning it over. That charge falls hardest on the layouts that move
+        patients through fastest, because they turn their spaces over most often, and on
+        room-heavy footprints, because a room takes ten times a chair.
+        <b>The chair figure applies wherever a chair is used</b>: both sides of a divided lane, and
+        the whole of the pooled one. The rooms-first layout has rooms by definition, and a divided
+        lane can say its assessment side is rooms &mdash; the control under Spaces &mdash; which is
+        what <i>8 rooms + 10 chairs</i> does.</div>
     </div>
     <div class="note">
       <h3>Where the complaint groups come from</h3>
@@ -225,7 +230,7 @@
         Volumes and test rates are measured per complaint; the SHAPE of the service times is
         department-wide, scaled to each complaint's own mean. The mix itself is measured on
         15:00&ndash;23:00 and applied to whatever window you pick &mdash; close for any daytime or
-        evening window, but an overnight lane would see a different mix than this assumes.</div>
+        15:00&ndash;23:00 window it was measured on, but an overnight lane would see a different mix than this assumes.</div>
     </div>
     <div class="note">
       <h3>The exclusion list — what the complaint field can and cannot see</h3>
@@ -239,7 +244,7 @@
     <div class="note">
       <h3>How the bed-required share is composed</h3>
       <div class="crit-f">The two parts add up: the complaints you tick, plus this share of
-        everyone else the lane accepts. That total is what the simulation uses &mdash; it is shown
+        everyone else the lane accepts. That total is what the page runs &mdash; it is shown
         above the list, and it is the number worth arguing about.</div>
     </div>
     <div class="note">
@@ -271,28 +276,28 @@
             patients who need no test at all. Nothing measures that either, and it decides whether
             two assessment chairs can work. Try both ways.</li>
         <li><b>The lane closes when you close it, and that is modelled.</b> Anyone still waiting for a space
-            goes to the main department. Without that rule the simulation quietly served its backlog
+            goes to the main department. Without that rule the page quietly served its backlog
             in overtime — a six-space lane ran until 09:04 the next morning and spent 45% of its
             work outside its own hours, which made every layout's worst hour land at 22:00 and read
             like a demand peak. It was the overtime bucket.</li>
-        <li><b>Read the wait and the diversions together.</b> The wait already includes the patients
+        <li><b>Read the wait and the patients sent away together.</b> The wait already includes the patients
             sent to the main department &mdash; but only for what they waited <i>in the lane</i>, up
             to closing. What they wait after that is not in it; the score is what charges that. So
             a layout that sends people away looks <i>worse</i> on the wait, not better: at its most
             crowded those patients are the ones waiting longest. The wait is the lane's own queue;
-            the score is the whole evening.</li>
+            the score is the whole day.</li>
         <li><b>The score prices everyone who arrives, including the ones you turn down.</b> Every
             other number here improves if the lane takes fewer patients — narrow the criteria, or
             let the queue spill past closing, and the average among those you served looks better
-            while the evening is unchanged. So the score charges the patients a lane does not
+            while the day is unchanged. So the score charges the patients a lane does not
             serve what they actually get instead: today's wait for a room in the main department,
             by hour — {{main15}} minutes at 15:00 rising to {{main22}} at 22:00. Accept nobody and you score
             exactly the status quo. There is no way to win by shrinking.</li>
-        <li><b>There is no "no fast track" comparison, and there cannot be.</b> The department has
+        <li><b>There is no &ldquo;no fast track&rdquo; comparison, and there cannot be.</b> The department has
             run one throughout the period measured here, so no lane-free day exists to compare
             against. This page briefly offered one, built by excluding the patients who went
             through today's pod — it was withdrawn because {{walkoutpct}}% of the walkouts in those hours have
-            no care area recorded at all, so they fell into the "no fast track" group by
+            no care area recorded at all, so they fell into the &ldquo;no fast track&rdquo; group by
             bookkeeping rather than by outcome, and what remained was the pod's overflow rather
             than a counterfactual.</li>
         <li><b>The bar is today, and today already has a fast track.</b> An ESI 4/5 patient
@@ -309,7 +314,7 @@
             offer.</li>
         <li><b>The clock starts at the door.</b> A patient cannot be put anywhere before
             registration and the start of triage &mdash; {{floor}} minutes on average here, barely varying
-            across the evening. That is added to every lane wait, because the figure it is
+            across the day. That is added to every lane wait, because the figure it is
             compared against &mdash; today's arrival-to-room &mdash; contains it too. Without it
             the lane was being credited with about 8 minutes it never saves.</li>
         <li><b>It assumes the main department is unaffected.</b> Taking work out of it should make
@@ -330,7 +335,7 @@
             number nobody can justify turns every comparison into a verdict against it. Compare
             the layouts with each other, and decide what is acceptable yourselves.</li>
         <li><b>Waits are averages, and small differences are noise.</b> Most patients wait nothing
-            at all, and half an evening's delay can land in a single hour — which is why the worst
+            at all, and half a day's delay can land in a single hour — which is why the worst
             hour is shown separately. Two layouts a minute or two apart are not reliably in that
             order; rerun them and they can swap.</li>
         <li><b>The bed-first layout is scored on delay, and that is not the case for it.</b>
@@ -359,20 +364,20 @@
       </ul>
     </div>
 
-        <div class="eyebrow">Genital complaints are their own row now &mdash; urinary ones are not in it</div>
-        <p>The sensitive-area half of Blake's rule used to be unexpressable here: only
-          <b>Dysuria</b> was broken out, and everything else genital sat inside
-          <i>Everything else</i>, a single button covering a quarter of the lane. It is now its
-          own row &mdash; <b>{{genn}} complaints</b>, <b>{{genpct}}%</b> of the lane &mdash;
-          small enough to tick without putting the department in rooms.</p>
+            <div class="note">
+      <h3>Genital complaints are their own row now &mdash; urinary ones are not in it</h3>
+        <p>The sensitive-area half of Blake&rsquo;s rule has its own row &mdash;
+          <b>{{genn}} complaints</b>, <b>{{genpct}}%</b> of the lane &mdash; small enough to mark
+          as needing a room without putting a quarter of the department in one.</p>
         <p><b>Urinary complaints are deliberately not in that group.</b> Dysuria, hematuria and
           urinary frequency or retention &mdash; <b>{{urinn}} visits, {{urinpct}}%</b> &mdash;
           do not usually need a sensitive exam, which is the whole reason the group exists
-          (physicians, 2026-08-22). <b>Dysuria has come off the list</b> for the same reason: it was
+          (physicians). <b>Dysuria is not on the list</b> for the same reason: it was
           Blake&rsquo;s sensitive-exam entry, and that is the rationale the physicians withdrew. It
           is still there to tick if the group wants it back on other grounds.</p>
-
-        <div class="eyebrow">An interpreter is now measured, not guessed</div>
+    </div>
+    <div class="note">
+      <h3>An interpreter is measured, not guessed</h3>
         <p><b>{{intp}}% of this lane records a preferred language other than English</b> &mdash; taken
           at registration, not judged at the bedside, and present for <b>{{intpcov}}%</b> of the
           window across <b>{{intpn}}</b> languages. Reading that as needing an interpreter is a
@@ -383,8 +388,9 @@
           complaint carries its own measured rate &mdash; from <b>{{intplo}}%</b> to
           <b>{{intphi}}%</b> &mdash; so narrowing the criteria moves it, as it should. It applies
           only to whoever the ticked complaints leave behind, so a patient is never counted twice.</p>
-
-        <div class="eyebrow">A sibling in the room, not a chair each</div>
+    </div>
+    <div class="note">
+      <h3>A sibling in the room, not a chair each</h3>
         <p><b>{{grpshare}}% of the children arriving in these hours come with a sibling</b>, and
           measured in the record rather than assumed &mdash; reshuffling arrival times among the
           same surnames puts the coincidence rate near zero. They are ticked as needing a room,
@@ -392,8 +398,9 @@
           lane, and because the lane takes the whole family or none of it.</p>
         <p>It is a <b>floor</b>: a family whose children have different surnames cannot be seen in
           the data at all, so the true share is higher by an amount nothing here can measure.</p>
-
-        <div class="eyebrow">And the part no chief complaint can capture</div>
+    </div>
+    <div class="note">
+      <h3>And the part no chief complaint can capture</h3>
         <p>Two reasons a patient needs a door remain uncodable, and the slider below is now for
           those alone:</p>
         <ul>
@@ -402,8 +409,8 @@
               their patience. A triage judgement made in the moment and written down nowhere.</li>
         </ul>
         <p>Neither will ever be a field, so this one stays a number only the group can set.
-          <b>It starts at zero, which is certainly too low</b> &mdash; but it is now a smaller job
-          than it was, because the two shares that could be measured have been.</p>
+          <b>It starts at zero, which is certainly too low</b> &mdash; but it is a smaller job than it
+          looks, because the two shares that could be measured already have been.</p>
         <p><b>Two of the reasons Blake names are deliberately absent from all of this:
           child-abuse evaluations and mental-health presentations.</b> Neither is missing from
           the data &mdash; they are missing from this <i>population</i>. Every encounter behind
@@ -416,9 +423,10 @@
         <p>Both still need a door. They are someone else's flow problem, not this lane's. And a
           concern that surfaces only <i>after</i> rooming is a third case again &mdash; no
           triage-time routing rule can act on that one either way.</p>
+    </div>
 </div>
 
-  <footer>Simulated live in your browser · 600 evenings × 4 runs per setting ·
+  <footer>Simulated live in your browser · {{days}} days &times; {{seeds}} runs per setting ·
       measured from ESI 4/5 visits 2025-01-01 &rarr; {{cut}} ·
-      the same engine that produced the figures in the scoping deck.</footer>
+      the same calculations behind the figures in the scoping deck.</footer>
 </div><!-- /wrap -->

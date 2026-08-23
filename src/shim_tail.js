@@ -600,7 +600,8 @@ setTimeout(()=>{
   const sizes = [];
   for(const want of ["pooled","bedfirst","stream","split"]){
     const btn = document.getElementById("modes").querySelectorAll("[data-m]").find(b=>b.dataset.m===want);
-    if(btn && btn.onclick) btn.onclick();
+    if(!btn || !btn.onclick){ sizes.push("NO HANDLER"); continue }   // a vacuous pass is a failure
+    btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
   console.log("the estate survives a switch :", sizes.every(v => v === 10)

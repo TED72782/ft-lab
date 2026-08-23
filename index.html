@@ -66,6 +66,7 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .opt .t{font-weight:600;font-size:14px}
 .opt .s{font-size:12.5px;color:var(--ink-2)}
 #presets button{background:var(--surface)}
+#presets button[aria-pressed="true"]{border-color:var(--hold);background:var(--hold-wash)}
 .strm{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;
   background:var(--surface)}
 .strm-h{font-size:13px;font-weight:600;margin-bottom:8px}
@@ -97,6 +98,9 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .tabs button:focus-visible{outline:2px solid var(--hold);outline-offset:2px}
 #tabNotes{max-width:760px}
 #tabNotes h3{margin:22px 0 8px}
+#tabNotes h2{font-size:15px;letter-spacing:.02em;margin:0 0 12px;color:var(--ink-2);
+  text-transform:uppercase}
+#tabNotes:focus-visible,#tabLab:focus-visible{outline:none}
 .seg{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .seg-l{font-size:12.5px;color:var(--ink-2)}
 .seg button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;
@@ -298,7 +302,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
 <header>
   <div class="eyebrow">Mary Bridge ED · fast-track lane · hours you choose</div>
   <h1>Fast Track Chair Lab</h1>
-  <p>Build a lane, run the evening, put it on the board. Every setting simulates 2,400 evenings
+  <p>Build a lane, run the day, put it on the board. Every setting simulates 2,400 days
      on service times measured from our own department, and a board entry is scored on the same
      2,400 &mdash; the page and the leaderboard cannot disagree about a lane. There is no pass
      mark here — the page
@@ -307,11 +311,11 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
 </header>
 
 <nav class="tabs" role="tablist">
-  <button type="button" id="tabLabBtn"   role="tab" aria-selected="true">The lab</button>
-  <button type="button" id="tabNotesBtn" role="tab" aria-selected="false">Notes &amp; method</button>
+  <button type="button" id="tabLabBtn"   role="tab" aria-selected="true" aria-controls="tabLab">The lab</button>
+  <button type="button" id="tabNotesBtn" role="tab" aria-selected="false" aria-controls="tabNotes">Notes &amp; method</button>
 </nav>
 
-<div id="tabLab">
+<div id="tabLab" role="tabpanel" tabindex="0" aria-labelledby="tabLabBtn">
 <div class="layout">
   <!-- ── controls ─────────────────────────────────────────── -->
   <div>
@@ -337,7 +341,9 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       <div class="panel-b">
         <div id="speedCtl"></div>
         <div id="turnCtl"></div>
-        <div class="crit-hint">A space is not free the moment a patient walks out of it. The chair figure applies wherever a chair is used; only a rooms layout has rooms to turn over. <span class="dim">Why, and what it costs, in <b>Notes &amp; method</b>.</span></div>
+        <div class="crit-hint">A space is not free the moment a patient walks out of it. The chair
+        figure applies wherever a chair is used; only a layout with rooms has rooms to turn over.
+        <span class="dim">What it costs, in <b>Notes &amp; method</b>.</span></div>
       </div>
     </section>
 
@@ -364,9 +370,9 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
 
     <section class="panel stage" style="margin-top:14px">
       <div class="stage-h">
-        <div><div class="eyebrow">One evening, played out</div>
+        <div><div class="eyebrow">One day, played out</div>
           <div class="stage-sub" id="stageHint">The same run the numbers come from — one seeded
-            evening, replayed on a clock. A space that looks full is full.</div></div>
+            day, replayed on a clock. A space that looks full is full.</div></div>
         <div class="stage-ctl">
           <span class="clock num" id="stageClock">--:--</span>
           <select id="speedSel" aria-label="playback speed">
@@ -375,8 +381,8 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
             <option value="120">fast</option>
             <option value="300">very fast</option>
           </select>
-          <button type="button" id="reroll" hidden>Another evening</button>
-          <button type="button" id="playBtn" class="primary">Play the evening</button>
+          <button type="button" id="reroll" hidden>Another day</button>
+          <button type="button" id="playBtn" class="primary">Play the day</button>
         </div>
       </div>
       <div class="stage-bar"><span id="stageBar"></span></div>
@@ -434,7 +440,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       <div class="crit-f">Complaints as triage records them, grouped so <i>Febrile</i> and <i>Fever</i> are one. <span class="dim">Full definitions in <b>Notes &amp; method</b>.</span></div>
     </section>
 
-    <!-- Blake's exclusion list. Hidden in the layouts that have no chairs to be excluded from. -->
+    <!-- Non-complaint routing rules. Shown only in the layouts that have rooms. -->
     <section class="panel crit" id="bedPanel" hidden>
       <div class="crit-h">
         <div><div class="eyebrow">Who needs a bed &mdash; beyond the complaints</div>
@@ -455,7 +461,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
           see, and what is deliberately absent &mdash; is in <b>Notes &amp; method</b> at the top.</p>
         <div id="bedExtraCtl"></div>
       </div>
-      <div class="crit-f">The parts add up, and the total above is what the simulation uses.</div>
+      <div class="crit-f">The parts add up, and the total above is what the page runs.</div>
     </section>
 
     <section class="panel board">
@@ -471,7 +477,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       <div class="board-scroll">
         <table class="board-t">
           <thead><tr><th>#</th><th>who</th><th>lane</th>
-            <th>spaces</th><th>hours</th><th>score<br>min/patient</th><th>of the<br>day</th><th>worst<br>hour</th><th>still waiting<br>at close</th><th></th></tr></thead>
+            <th>spaces</th><th>hours</th><th>score<br>min/patient</th><th>share of<br>the day</th><th>worst<br>hour</th><th>still waiting<br>at close</th><th></th></tr></thead>
           <tbody id="boardBody"></tbody>
         </table>
       </div>
@@ -493,7 +499,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       <input id="apiUrl" type="url" placeholder="https://script.google.com/…/exec"
              aria-label="shared board endpoint">
       <button type="button" id="apiSave" class="primary">Save</button>
-      <p>Paste the web-app URL from SETUP-SHARED-BOARD.md. Only one person needs to do this —
+      <p>Paste the web-app address your board was set up with. Only one person needs to do this —
          once it is set, <b>Copy link to this setup</b> produces a link that joins everyone else
          to the same board automatically. Leave it empty to return to the group's shared board,
          which this page uses by default.</p>
@@ -503,16 +509,19 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
 </div>
 </div><!-- /tabLab -->
 
-<div id="tabNotes" hidden>
+<div id="tabNotes" role="tabpanel" tabindex="0"
+     aria-labelledby="tabNotesBtn" hidden>
+    <h2>Notes &amp; method</h2>
     <div class="note">
       <h3>Turnover</h3>
-      <div class="crit-hint">A space is not free the moment a patient walks out of it. Until
-          2026-08-22 this page assumed it was, which quietly handed every layout back capacity it
-          does not have &mdash; and handed the most to the fastest layouts, because they turn their
-          spaces over most often. <b>The chair figure applies wherever a chair is used</b>, which is
-          both sides of a divided lane and the whole of the pooled one. The rooms-first layout has
-          rooms by definition, and a divided lane can say its assessment side is rooms &mdash; the
-          control under Spaces &mdash; which is what <i>8 rooms + 10 chairs</i> does. Set both to zero to see the old behaviour.</div>
+      <div class="crit-hint">A space is not free the moment a patient walks out of it, and the
+        lane is charged for turning it over. That charge falls hardest on the layouts that move
+        patients through fastest, because they turn their spaces over most often, and on
+        room-heavy footprints, because a room takes ten times a chair.
+        <b>The chair figure applies wherever a chair is used</b>: both sides of a divided lane, and
+        the whole of the pooled one. The rooms-first layout has rooms by definition, and a divided
+        lane can say its assessment side is rooms &mdash; the control under Spaces &mdash; which is
+        what <i>8 rooms + 10 chairs</i> does.</div>
     </div>
     <div class="note">
       <h3>Where the complaint groups come from</h3>
@@ -521,7 +530,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
         Volumes and test rates are measured per complaint; the SHAPE of the service times is
         department-wide, scaled to each complaint's own mean. The mix itself is measured on
         15:00&ndash;23:00 and applied to whatever window you pick &mdash; close for any daytime or
-        evening window, but an overnight lane would see a different mix than this assumes.</div>
+        15:00&ndash;23:00 window it was measured on, but an overnight lane would see a different mix than this assumes.</div>
     </div>
     <div class="note">
       <h3>The exclusion list — what the complaint field can and cannot see</h3>
@@ -535,7 +544,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
     <div class="note">
       <h3>How the bed-required share is composed</h3>
       <div class="crit-f">The two parts add up: the complaints you tick, plus this share of
-        everyone else the lane accepts. That total is what the simulation uses &mdash; it is shown
+        everyone else the lane accepts. That total is what the page runs &mdash; it is shown
         above the list, and it is the number worth arguing about.</div>
     </div>
     <div class="note">
@@ -567,28 +576,28 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
             patients who need no test at all. Nothing measures that either, and it decides whether
             two assessment chairs can work. Try both ways.</li>
         <li><b>The lane closes when you close it, and that is modelled.</b> Anyone still waiting for a space
-            goes to the main department. Without that rule the simulation quietly served its backlog
+            goes to the main department. Without that rule the page quietly served its backlog
             in overtime — a six-space lane ran until 09:04 the next morning and spent 45% of its
             work outside its own hours, which made every layout's worst hour land at 22:00 and read
             like a demand peak. It was the overtime bucket.</li>
-        <li><b>Read the wait and the diversions together.</b> The wait already includes the patients
+        <li><b>Read the wait and the patients sent away together.</b> The wait already includes the patients
             sent to the main department &mdash; but only for what they waited <i>in the lane</i>, up
             to closing. What they wait after that is not in it; the score is what charges that. So
             a layout that sends people away looks <i>worse</i> on the wait, not better: at its most
             crowded those patients are the ones waiting longest. The wait is the lane's own queue;
-            the score is the whole evening.</li>
+            the score is the whole day.</li>
         <li><b>The score prices everyone who arrives, including the ones you turn down.</b> Every
             other number here improves if the lane takes fewer patients — narrow the criteria, or
             let the queue spill past closing, and the average among those you served looks better
-            while the evening is unchanged. So the score charges the patients a lane does not
+            while the day is unchanged. So the score charges the patients a lane does not
             serve what they actually get instead: today's wait for a room in the main department,
             by hour — 32 minutes at 15:00 rising to 107 at 22:00. Accept nobody and you score
             exactly the status quo. There is no way to win by shrinking.</li>
-        <li><b>There is no "no fast track" comparison, and there cannot be.</b> The department has
+        <li><b>There is no &ldquo;no fast track&rdquo; comparison, and there cannot be.</b> The department has
             run one throughout the period measured here, so no lane-free day exists to compare
             against. This page briefly offered one, built by excluding the patients who went
             through today's pod — it was withdrawn because 59% of the walkouts in those hours have
-            no care area recorded at all, so they fell into the "no fast track" group by
+            no care area recorded at all, so they fell into the &ldquo;no fast track&rdquo; group by
             bookkeeping rather than by outcome, and what remained was the pod's overflow rather
             than a counterfactual.</li>
         <li><b>The bar is today, and today already has a fast track.</b> An ESI 4/5 patient
@@ -605,7 +614,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
             offer.</li>
         <li><b>The clock starts at the door.</b> A patient cannot be put anywhere before
             registration and the start of triage &mdash; 8.0 minutes on average here, barely varying
-            across the evening. That is added to every lane wait, because the figure it is
+            across the day. That is added to every lane wait, because the figure it is
             compared against &mdash; today's arrival-to-room &mdash; contains it too. Without it
             the lane was being credited with about 8 minutes it never saves.</li>
         <li><b>It assumes the main department is unaffected.</b> Taking work out of it should make
@@ -626,7 +635,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
             number nobody can justify turns every comparison into a verdict against it. Compare
             the layouts with each other, and decide what is acceptable yourselves.</li>
         <li><b>Waits are averages, and small differences are noise.</b> Most patients wait nothing
-            at all, and half an evening's delay can land in a single hour — which is why the worst
+            at all, and half a day's delay can land in a single hour — which is why the worst
             hour is shown separately. Two layouts a minute or two apart are not reliably in that
             order; rerun them and they can swap.</li>
         <li><b>The bed-first layout is scored on delay, and that is not the case for it.</b>
@@ -655,20 +664,20 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       </ul>
     </div>
 
-        <div class="eyebrow">Genital complaints are their own row now &mdash; urinary ones are not in it</div>
-        <p>The sensitive-area half of Blake's rule used to be unexpressable here: only
-          <b>Dysuria</b> was broken out, and everything else genital sat inside
-          <i>Everything else</i>, a single button covering a quarter of the lane. It is now its
-          own row &mdash; <b>18 complaints</b>, <b>0.87%</b> of the lane &mdash;
-          small enough to tick without putting the department in rooms.</p>
+            <div class="note">
+      <h3>Genital complaints are their own row now &mdash; urinary ones are not in it</h3>
+        <p>The sensitive-area half of Blake&rsquo;s rule has its own row &mdash;
+          <b>18 complaints</b>, <b>0.87%</b> of the lane &mdash; small enough to mark
+          as needing a room without putting a quarter of the department in one.</p>
         <p><b>Urinary complaints are deliberately not in that group.</b> Dysuria, hematuria and
           urinary frequency or retention &mdash; <b>205 visits, 1.3%</b> &mdash;
           do not usually need a sensitive exam, which is the whole reason the group exists
-          (physicians, 2026-08-22). <b>Dysuria has come off the list</b> for the same reason: it was
+          (physicians). <b>Dysuria is not on the list</b> for the same reason: it was
           Blake&rsquo;s sensitive-exam entry, and that is the rationale the physicians withdrew. It
           is still there to tick if the group wants it back on other grounds.</p>
-
-        <div class="eyebrow">An interpreter is now measured, not guessed</div>
+    </div>
+    <div class="note">
+      <h3>An interpreter is measured, not guessed</h3>
         <p><b>11.4% of this lane records a preferred language other than English</b> &mdash; taken
           at registration, not judged at the bedside, and present for <b>99.7%</b> of the
           window across <b>18</b> languages. Reading that as needing an interpreter is a
@@ -679,8 +688,9 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
           complaint carries its own measured rate &mdash; from <b>4.2%</b> to
           <b>24.1%</b> &mdash; so narrowing the criteria moves it, as it should. It applies
           only to whoever the ticked complaints leave behind, so a patient is never counted twice.</p>
-
-        <div class="eyebrow">A sibling in the room, not a chair each</div>
+    </div>
+    <div class="note">
+      <h3>A sibling in the room, not a chair each</h3>
         <p><b>5.61% of the children arriving in these hours come with a sibling</b>, and
           measured in the record rather than assumed &mdash; reshuffling arrival times among the
           same surnames puts the coincidence rate near zero. They are ticked as needing a room,
@@ -688,8 +698,9 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
           lane, and because the lane takes the whole family or none of it.</p>
         <p>It is a <b>floor</b>: a family whose children have different surnames cannot be seen in
           the data at all, so the true share is higher by an amount nothing here can measure.</p>
-
-        <div class="eyebrow">And the part no chief complaint can capture</div>
+    </div>
+    <div class="note">
+      <h3>And the part no chief complaint can capture</h3>
         <p>Two reasons a patient needs a door remain uncodable, and the slider below is now for
           those alone:</p>
         <ul>
@@ -698,8 +709,8 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
               their patience. A triage judgement made in the moment and written down nowhere.</li>
         </ul>
         <p>Neither will ever be a field, so this one stays a number only the group can set.
-          <b>It starts at zero, which is certainly too low</b> &mdash; but it is now a smaller job
-          than it was, because the two shares that could be measured have been.</p>
+          <b>It starts at zero, which is certainly too low</b> &mdash; but it is a smaller job than it
+          looks, because the two shares that could be measured already have been.</p>
         <p><b>Two of the reasons Blake names are deliberately absent from all of this:
           child-abuse evaluations and mental-health presentations.</b> Neither is missing from
           the data &mdash; they are missing from this <i>population</i>. Every encounter behind
@@ -712,14 +723,15 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
         <p>Both still need a door. They are someone else's flow problem, not this lane's. And a
           concern that surfaces only <i>after</i> rooming is a third case again &mdash; no
           triage-time routing rule can act on that one either way.</p>
+    </div>
 </div>
 
-  <footer>Simulated live in your browser · 600 evenings × 4 runs per setting ·
+  <footer>Simulated live in your browser · 600 days &times; 4 runs per setting ·
       measured from ESI 4/5 visits 2025-01-01 &rarr; 2026-08-12 ·
-      the same engine that produced the figures in the scoping deck.</footer>
+      the same calculations behind the figures in the scoping deck.</footer>
 </div><!-- /wrap -->
 <script>
-const D = {"pom": 25, "cut": "2026-08-12", "day_mean": 54.6, "lam": [2.8947, 3.1851, 3.455, 3.5823, 3.8574, 3.8489, 3.3786, 2.5976], "lam24": [1.4618, 1.0153, 0.781, 0.691, 0.6757, 0.5484, 0.7216, 1.1205, 1.5942, 2.4092, 2.8149, 3.2003, 3.0238, 2.8981, 2.8353, 2.8981, 3.1885, 3.4601, 3.584, 3.8625, 3.8591, 3.3837, 2.5976, 1.9745], "day": {"10": 38, "25": 46, "50": 54, "75": 63, "90": 72, "95": 78}, "eve": [8, 8, 10, 11, 11, 11, 11, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 38, 38, 38, 38, 38, 38, 39, 39, 39, 39, 39, 40, 40, 40, 41, 41, 42, 42, 42, 42, 42, 42, 42, 42, 43, 43, 43, 44, 44, 45, 45, 46, 46, 47, 48], "eve_n": 589, "eve_p": {"10": 18, "25": 22, "50": 26, "75": 31, "90": 36, "95": 38}, "shr": 0.498105, "now": [1, 13, 17, 18, 19, 20, 21, 22, 23, 24, 24, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 33, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 38, 38, 38, 39, 39, 40, 40, 40, 41, 41, 41, 42, 42, 42, 43, 43, 44, 44, 44, 45, 45, 45, 46, 46, 46, 47, 47, 47, 48, 48, 48, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 53, 53, 53, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 60, 60, 60, 61, 61, 62, 62, 62, 63, 63, 63, 64, 64, 65, 65, 65, 66, 66, 67, 67, 68, 68, 69, 69, 70, 70, 70, 71, 71, 72, 72, 73, 73, 74, 74, 74, 75, 75, 76, 76, 77, 77, 78, 78, 78, 79, 79, 80, 80, 81, 81, 82, 82, 83, 83, 84, 85, 85, 86, 86, 87, 87, 88, 88, 89, 89, 90, 90, 91, 91, 92, 92, 93, 93, 94, 95, 95, 96, 96, 97, 98, 98, 99, 100, 100, 101, 101, 102, 103, 104, 104, 105, 106, 107, 107, 108, 109, 110, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 132, 133, 134, 135, 136, 138, 139, 140, 142, 143, 145, 146, 148, 149, 151, 153, 155, 157, 159, 161, 163, 166, 169, 171, 174, 178, 181, 186, 189, 194, 201, 207, 214, 225, 240, 261, 304, 1529], "asw": [25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 26, 26, 26, 27, 27, 28, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 33, 34, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 41, 41, 41, 41, 42, 42, 42, 42, 43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45, 46, 46, 46, 47, 47, 47, 47, 48, 48, 48, 49, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 52, 53, 53, 54, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 59, 59, 59, 60, 60, 61, 61, 61, 62, 62, 63, 63, 63, 64, 64, 65, 65, 66, 66, 67, 67, 68, 68, 68, 69, 69, 70, 71, 71, 72, 72, 73, 73, 74, 74, 75, 75, 76, 77, 77, 78, 79, 79, 80, 80, 81, 82, 82, 83, 84, 84, 85, 86, 87, 88, 88, 89, 90, 91, 91, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 103, 104, 105, 106, 107, 109, 110, 112, 112, 114, 115, 116, 118, 119, 121, 123, 125, 127, 128, 130, 132, 134, 137, 141, 143, 147, 150, 153, 156, 162, 169, 175, 184, 198, 220, 441], "res": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2, 2, 3.0, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 10, 10, 11, 12, 12.0, 13, 13.0, 14.0, 15, 15, 16, 17.0, 17.0, 18, 18, 19, 20, 20, 21, 21, 22.0, 23, 23.0, 24, 25, 25.0, 26, 27.0, 27.0, 28, 29.0, 29, 30.0, 30.0, 31, 32, 32, 33, 34, 34.0, 35, 35, 36, 36, 37, 38, 38, 39.0, 39.0, 40, 40.0, 41, 41.0, 42.0, 43, 43.0, 44, 44, 45, 46, 46, 47.0, 47, 48, 48, 49.0, 50.0, 50.0, 51.0, 51, 52, 52, 53, 53, 54, 54, 55.0, 55, 56, 57, 57, 58, 58, 59, 60, 60, 61, 61, 62, 63, 63.0, 64, 65, 65, 66, 66, 67, 67, 68.0, 69, 70, 70, 71, 72, 73, 73, 74, 74, 75, 76, 76, 77.0, 78, 79, 79, 80, 81, 82, 82, 83, 84, 85, 85, 86.0, 87.0, 88.0, 89, 89.0, 90, 91.0, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 102, 102, 103, 104, 105, 106, 107, 108.0, 109, 110, 111, 113, 114, 115, 116, 118.0, 119, 120, 121, 123, 124, 125, 127, 128, 129.0, 130, 132.0, 133.0, 135.0, 137, 139, 140, 142, 144, 146.0, 147, 149, 151.0, 154, 156.0, 158.0, 161, 163, 167, 170, 172, 175, 178, 181, 184, 189.0, 192, 196, 201, 205, 209, 214, 220, 227.0, 235, 243, 251, 262, 272.0, 284, 298, 315, 335, 365.0, 414, 507, 4566], "mean_now": 83.0, "mean_asw": 61.8, "mean_res": 79.8, "T_A": 72.43, "T_R": 78.68, "g": {"shr": 0.5035, "asw": 62.0, "res": 78.3, "now": 85.8, "rd": 20.0, "dd": 41.3, "ddall": 66.5, "interp": 0.114, "interp_cov": 0.9973}, "hold_all": 111.6, "floor": 8.0, "main24": [98.7, 89.9, 65, 47.0, 35.7, 23.2, 18.7, 15.6, 16.3, 23.6, 25.8, 27.2, 33.8, 38.6, 39.2, 31.6, 38.1, 41.2, 46.5, 53.8, 67.4, 85.6, 107.0, 109.3], "main_mean": 50.0, "nolane24": [100.8, 89.9, 65.0, 47.1, 35.7, 23.2, 18.0, 15.3, 15.3, 17.4, 18.5, 28.0, 34.0, 38.6, 39.2, 31.4, 38.8, 44.6, 52.2, 70.0, 93.6, 115.8, 117.8, 113.6], "nolane_mean": 59.2, "cc": [{"n": "Fever", "s": 0.16679, "x": 0.1658, "w": 0.665, "a": 73.7, "r": 69.4, "o": 86.8, "dd": 35.1, "me": 0, "ddall": 70.2}, {"n": "Cough", "s": 0.08523, "x": 0.1075, "w": 0.62, "a": 68.8, "r": 60.8, "o": 79.2, "dd": 33.2, "me": 0, "ddall": 63.2}, {"n": "Rash", "s": 0.05193, "x": 0.16, "w": 0.192, "a": 82.3, "r": 45.9, "o": 75.6, "dd": 30.3, "me": 0, "ddall": 35.5}, {"n": "Vomiting", "s": 0.0518, "x": 0.1443, "w": 0.518, "a": 71.8, "r": 100.5, "o": 96.5, "dd": 52.2, "me": 0, "ddall": 82.8}, {"n": "Ear Problem", "s": 0.04939, "x": 0.1223, "w": 0.101, "a": 73.2, "r": 75.0, "o": 69.1, "dd": 28.5, "me": 0, "ddall": 33.6}, {"n": "Fall", "s": 0.03761, "x": 0.0745, "w": 0.306, "a": 54.0, "r": 91.6, "o": 92.8, "dd": 54.2, "me": 0, "ddall": 67.8}, {"n": "Head Injury", "s": 0.03641, "x": 0.0539, "w": 0.132, "a": 70.6, "r": 111.4, "o": 91, "dd": 46.6, "me": 0, "ddall": 60.4}, {"n": "URI", "s": 0.03305, "x": 0.1111, "w": 0.597, "a": 72.2, "r": 55.0, "o": 86.2, "dd": 38.9, "me": 0, "ddall": 62.5}, {"n": "Laceration", "s": 0.02748, "x": 0.0486, "w": 0.116, "a": 58.2, "r": 109.2, "o": 115.0, "dd": 70.6, "me": 0, "ddall": 75.7}, {"n": "Abdominal Pain", "s": 0.01969, "x": 0.1581, "w": 0.749, "a": 60.1, "r": 125.6, "o": 105.4, "dd": 53.3, "me": 0, "ddall": 122.3}, {"n": "Breathing Difficulty", "s": 0.01925, "x": 0.0662, "w": 0.507, "a": 77.3, "r": 76.1, "o": 98.5, "dd": 46.2, "me": 0, "ddall": 71.8}, {"n": "Eye Problem", "s": 0.019, "x": 0.1717, "w": 0.092, "a": 80.8, "r": 73.2, "o": 81.3, "dd": 39.8, "me": 0, "ddall": 45.6}, {"n": "Arm Injury", "s": 0.01779, "x": 0.0679, "w": 0.757, "a": 37.6, "r": 72.9, "o": 50.0, "dd": 20.7, "me": 0, "ddall": 63.1}, {"n": "Finger Injury", "s": 0.0171, "x": 0.1074, "w": 0.83, "a": 35.0, "r": 76.4, "o": 97.2, "dd": 45.1, "me": 0, "ddall": 64.5}, {"n": "Throat Pain", "s": 0.01665, "x": 0.1369, "w": 0.762, "a": 61.4, "r": 47.0, "o": 81.6, "dd": 37.6, "me": 0, "ddall": 63.2}, {"n": "Skin Problem", "s": 0.01444, "x": 0.1106, "w": 0.231, "a": 92.7, "r": 81.2, "o": 87.5, "dd": 34.8, "me": 0, "ddall": 50.6}, {"n": "Diarrhea", "s": 0.01292, "x": 0.2414, "w": 0.469, "a": 74.8, "r": 87.7, "o": 83.7, "dd": 41.5, "me": 0, "ddall": 70.9}, {"n": "Ankle Injury", "s": 0.0126, "x": 0.0653, "w": 0.99, "a": 29.4, "r": 84.8, "o": 85.8, "dd": 41.3, "me": 1, "ddall": 74.1}, {"n": "Well Child", "s": 0.01209, "x": 0.0419, "w": 0.373, "a": 71.1, "r": 154.3, "o": 83.8, "dd": 42.1, "me": 0, "ddall": 83.0}, {"n": "Headache", "s": 0.01083, "x": 0.1287, "w": 0.555, "a": 86.9, "r": 77.4, "o": 105.5, "dd": 61.6, "me": 0, "ddall": 91.7}, {"n": "Dysuria", "s": 0.01057, "x": 0.0539, "w": 0.981, "a": 36.4, "r": 82.4, "o": 85.8, "dd": 41.3, "me": 1, "ddall": 83.8}, {"n": "Constipation", "s": 0.00963, "x": 0.1842, "w": 0.421, "a": 66.6, "r": 109.3, "o": 116.9, "dd": 73.4, "me": 0, "ddall": 101.3}, {"n": "Foot Injury", "s": 0.00887, "x": 0.0857, "w": 0.877, "a": 34.1, "r": 84.0, "o": 99.8, "dd": 41.3, "me": 1, "ddall": 69.5}, {"n": "Musculoskeletal Problem", "s": 0.00855, "x": 0.0963, "w": 0.876, "a": 46.8, "r": 90.2, "o": 73.3, "dd": 41.3, "me": 1, "ddall": 78.2}, {"n": "Genital & sensitive exam (18)", "s": 0.00868, "x": 0.1022, "w": 0.524, "a": 66.6, "r": 84.9, "o": 76.6, "dd": 29.9, "me": 0, "ddall": 64.1, "k": "genital"}, {"n": "Everything else (209 complaints)", "s": 0.24164, "x": 0.0844, "w": 0.521, "a": 53.1, "r": 84.2, "o": 83.9, "dd": 41.3, "me": 0, "ddall": 68.2}], "grp": {"p2": 0.02329, "p3": 0.00293, "p4": 0.00059, "mean_group_size": 1.03092, "cut": "ESI 4/5, 15-22h, from 2025-01-01", "share": 0.0561}, "prose": {"toorder": 37, "refasw": 62, "pom": 25, "main15": 32, "main22": 107, "mean1523": 58.1, "mainmean": 50.0, "floor": 8.0, "cut": "2026-08-12", "genn": 18, "genpct": 0.87, "urinn": 205, "urinpct": 1.3, "intp": 11.4, "intplo": 4.2, "intphi": 24.1, "intpcov": 99.7, "intpn": 18, "grppct": 2.68, "grpshare": 5.61, "ftspan": "11:00\u201320:00", "peakspan": "19:00\u201320:00", "worstspan": "22:00\u201323:00", "podlo": 66, "podhi": 69, "poduntil": 18, "podwlo": 27, "podwhi": 45, "otherlo": 28, "otherhi": 118, "walkoutpct": 59}};
+const D = {"pom": 25, "cut": "2026-08-12", "day_mean": 54.6, "lam": [2.8947, 3.1851, 3.455, 3.5823, 3.8574, 3.8489, 3.3786, 2.5976], "lam24": [1.4618, 1.0153, 0.781, 0.691, 0.6757, 0.5484, 0.7216, 1.1205, 1.5942, 2.4092, 2.8149, 3.2003, 3.0238, 2.8981, 2.8353, 2.8981, 3.1885, 3.4601, 3.584, 3.8625, 3.8591, 3.3837, 2.5976, 1.9745], "day": {"10": 38, "25": 46, "50": 54, "75": 63, "90": 72, "95": 78}, "eve": [8, 8, 10, 11, 11, 11, 11, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 38, 38, 38, 38, 38, 38, 39, 39, 39, 39, 39, 40, 40, 40, 41, 41, 42, 42, 42, 42, 42, 42, 42, 42, 43, 43, 43, 44, 44, 45, 45, 46, 46, 47, 48], "eve_n": 589, "eve_p": {"10": 18, "25": 22, "50": 26, "75": 31, "90": 36, "95": 38}, "shr": 0.498105, "now": [1, 13, 17, 18, 19, 20, 21, 22, 23, 24, 24, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 33, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 38, 38, 38, 39, 39, 40, 40, 40, 41, 41, 41, 42, 42, 42, 43, 43, 44, 44, 44, 45, 45, 45, 46, 46, 46, 47, 47, 47, 48, 48, 48, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 53, 53, 53, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 60, 60, 60, 61, 61, 62, 62, 62, 63, 63, 63, 64, 64, 65, 65, 65, 66, 66, 67, 67, 68, 68, 69, 69, 70, 70, 70, 71, 71, 72, 72, 73, 73, 74, 74, 74, 75, 75, 76, 76, 77, 77, 78, 78, 78, 79, 79, 80, 80, 81, 81, 82, 82, 83, 83, 84, 85, 85, 86, 86, 87, 87, 88, 88, 89, 89, 90, 90, 91, 91, 92, 92, 93, 93, 94, 95, 95, 96, 96, 97, 98, 98, 99, 100, 100, 101, 101, 102, 103, 104, 104, 105, 106, 107, 107, 108, 109, 110, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 132, 133, 134, 135, 136, 138, 139, 140, 142, 143, 145, 146, 148, 149, 151, 153, 155, 157, 159, 161, 163, 166, 169, 171, 174, 178, 181, 186, 189, 194, 201, 207, 214, 225, 240, 261, 304, 1529], "asw": [25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 26, 26, 26, 27, 27, 28, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 33, 34, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 41, 41, 41, 41, 42, 42, 42, 42, 43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45, 46, 46, 46, 47, 47, 47, 47, 48, 48, 48, 49, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 52, 53, 53, 54, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 59, 59, 59, 60, 60, 61, 61, 61, 62, 62, 63, 63, 63, 64, 64, 65, 65, 66, 66, 67, 67, 68, 68, 68, 69, 69, 70, 71, 71, 72, 72, 73, 73, 74, 74, 75, 75, 76, 77, 77, 78, 79, 79, 80, 80, 81, 82, 82, 83, 84, 84, 85, 86, 87, 88, 88, 89, 90, 91, 91, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 103, 104, 105, 106, 107, 109, 110, 112, 112, 114, 115, 116, 118, 119, 121, 123, 125, 127, 128, 130, 132, 134, 137, 141, 143, 147, 150, 153, 156, 162, 169, 175, 184, 198, 220, 441], "res": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2, 2, 3.0, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 10, 10, 11, 12, 12.0, 13, 13.0, 14.0, 15, 15, 16, 17.0, 17.0, 18, 18, 19, 20, 20, 21, 21, 22.0, 23, 23.0, 24, 25, 25.0, 26, 27.0, 27.0, 28, 29.0, 29, 30.0, 30.0, 31, 32, 32, 33, 34, 34.0, 35, 35, 36, 36, 37, 38, 38, 39.0, 39.0, 40, 40.0, 41, 41.0, 42.0, 43, 43.0, 44, 44, 45, 46, 46, 47.0, 47, 48, 48, 49.0, 50.0, 50.0, 51.0, 51, 52, 52, 53, 53, 54, 54, 55.0, 55, 56, 57, 57, 58, 58, 59, 60, 60, 61, 61, 62, 63, 63.0, 64, 65, 65, 66, 66, 67, 67, 68.0, 69, 70, 70, 71, 72, 73, 73, 74, 74, 75, 76, 76, 77.0, 78, 79, 79, 80, 81, 82, 82, 83, 84, 85, 85, 86.0, 87.0, 88.0, 89, 89.0, 90, 91.0, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 102, 102, 103, 104, 105, 106, 107, 108.0, 109, 110, 111, 113, 114, 115, 116, 118.0, 119, 120, 121, 123, 124, 125, 127, 128, 129.0, 130, 132.0, 133.0, 135.0, 137, 139, 140, 142, 144, 146.0, 147, 149, 151.0, 154, 156.0, 158.0, 161, 163, 167, 170, 172, 175, 178, 181, 184, 189.0, 192, 196, 201, 205, 209, 214, 220, 227.0, 235, 243, 251, 262, 272.0, 284, 298, 315, 335, 365.0, 414, 507, 4566], "mean_now": 83.0, "mean_asw": 61.8, "mean_res": 79.8, "T_A": 72.43, "T_R": 78.68, "g": {"shr": 0.5035, "asw": 62.0, "res": 78.3, "now": 85.8, "rd": 20.0, "dd": 41.3, "ddall": 66.5, "interp": 0.114, "interp_cov": 0.9973}, "hold_all": 111.6, "floor": 8.0, "main24": [98.7, 89.9, 65, 47.0, 35.7, 23.2, 18.7, 15.6, 16.3, 23.6, 25.8, 27.2, 33.8, 38.6, 39.2, 31.6, 38.1, 41.2, 46.5, 53.8, 67.4, 85.6, 107.0, 109.3], "main_mean": 50.0, "nolane24": [100.8, 89.9, 65.0, 47.1, 35.7, 23.2, 18.0, 15.3, 15.3, 17.4, 18.5, 28.0, 34.0, 38.6, 39.2, 31.4, 38.8, 44.6, 52.2, 70.0, 93.6, 115.8, 117.8, 113.6], "nolane_mean": 59.2, "cc": [{"n": "Fever", "s": 0.16679, "x": 0.1658, "w": 0.665, "a": 73.7, "r": 69.4, "o": 86.8, "dd": 35.1, "me": 0, "ddall": 70.2}, {"n": "Cough", "s": 0.08523, "x": 0.1075, "w": 0.62, "a": 68.8, "r": 60.8, "o": 79.2, "dd": 33.2, "me": 0, "ddall": 63.2}, {"n": "Rash", "s": 0.05193, "x": 0.16, "w": 0.192, "a": 82.3, "r": 45.9, "o": 75.6, "dd": 30.3, "me": 0, "ddall": 35.5}, {"n": "Vomiting", "s": 0.0518, "x": 0.1443, "w": 0.518, "a": 71.8, "r": 100.5, "o": 96.5, "dd": 52.2, "me": 0, "ddall": 82.8}, {"n": "Ear Problem", "s": 0.04939, "x": 0.1223, "w": 0.101, "a": 73.2, "r": 75.0, "o": 69.1, "dd": 28.5, "me": 0, "ddall": 33.6}, {"n": "Fall", "s": 0.03761, "x": 0.0745, "w": 0.306, "a": 54.0, "r": 91.6, "o": 92.8, "dd": 54.2, "me": 0, "ddall": 67.8}, {"n": "Head Injury", "s": 0.03641, "x": 0.0539, "w": 0.132, "a": 70.6, "r": 111.4, "o": 91, "dd": 46.6, "me": 0, "ddall": 60.4}, {"n": "URI", "s": 0.03305, "x": 0.1111, "w": 0.597, "a": 72.2, "r": 55.0, "o": 86.2, "dd": 38.9, "me": 0, "ddall": 62.5}, {"n": "Laceration", "s": 0.02748, "x": 0.0486, "w": 0.116, "a": 58.2, "r": 109.2, "o": 115.0, "dd": 70.6, "me": 0, "ddall": 75.7}, {"n": "Abdominal Pain", "s": 0.01969, "x": 0.1581, "w": 0.749, "a": 60.1, "r": 125.6, "o": 105.4, "dd": 53.3, "me": 0, "ddall": 122.3}, {"n": "Breathing Difficulty", "s": 0.01925, "x": 0.0662, "w": 0.507, "a": 77.3, "r": 76.1, "o": 98.5, "dd": 46.2, "me": 0, "ddall": 71.8}, {"n": "Eye Problem", "s": 0.019, "x": 0.1717, "w": 0.092, "a": 80.8, "r": 73.2, "o": 81.3, "dd": 39.8, "me": 0, "ddall": 45.6}, {"n": "Arm Injury", "s": 0.01779, "x": 0.0679, "w": 0.757, "a": 37.6, "r": 72.9, "o": 50.0, "dd": 20.7, "me": 0, "ddall": 63.1}, {"n": "Finger Injury", "s": 0.0171, "x": 0.1074, "w": 0.83, "a": 35.0, "r": 76.4, "o": 97.2, "dd": 45.1, "me": 0, "ddall": 64.5}, {"n": "Throat Pain", "s": 0.01665, "x": 0.1369, "w": 0.762, "a": 61.4, "r": 47.0, "o": 81.6, "dd": 37.6, "me": 0, "ddall": 63.2}, {"n": "Skin Problem", "s": 0.01444, "x": 0.1106, "w": 0.231, "a": 92.7, "r": 81.2, "o": 87.5, "dd": 34.8, "me": 0, "ddall": 50.6}, {"n": "Diarrhea", "s": 0.01292, "x": 0.2414, "w": 0.469, "a": 74.8, "r": 87.7, "o": 83.7, "dd": 41.5, "me": 0, "ddall": 70.9}, {"n": "Ankle Injury", "s": 0.0126, "x": 0.0653, "w": 0.99, "a": 29.4, "r": 84.8, "o": 85.8, "dd": 41.3, "me": 1, "ddall": 74.1}, {"n": "Well Child", "s": 0.01209, "x": 0.0419, "w": 0.373, "a": 71.1, "r": 154.3, "o": 83.8, "dd": 42.1, "me": 0, "ddall": 83.0}, {"n": "Headache", "s": 0.01083, "x": 0.1287, "w": 0.555, "a": 86.9, "r": 77.4, "o": 105.5, "dd": 61.6, "me": 0, "ddall": 91.7}, {"n": "Dysuria", "s": 0.01057, "x": 0.0539, "w": 0.981, "a": 36.4, "r": 82.4, "o": 85.8, "dd": 41.3, "me": 1, "ddall": 83.8}, {"n": "Constipation", "s": 0.00963, "x": 0.1842, "w": 0.421, "a": 66.6, "r": 109.3, "o": 116.9, "dd": 73.4, "me": 0, "ddall": 101.3}, {"n": "Foot Injury", "s": 0.00887, "x": 0.0857, "w": 0.877, "a": 34.1, "r": 84.0, "o": 99.8, "dd": 41.3, "me": 1, "ddall": 69.5}, {"n": "Musculoskeletal Problem", "s": 0.00855, "x": 0.0963, "w": 0.876, "a": 46.8, "r": 90.2, "o": 73.3, "dd": 41.3, "me": 1, "ddall": 78.2}, {"n": "Genital & sensitive exam (18)", "s": 0.00868, "x": 0.1022, "w": 0.524, "a": 66.6, "r": 84.9, "o": 76.6, "dd": 29.9, "me": 0, "ddall": 64.1, "k": "genital"}, {"n": "Everything else (209 complaints)", "s": 0.24164, "x": 0.0844, "w": 0.521, "a": 53.1, "r": 84.2, "o": 83.9, "dd": 41.3, "me": 0, "ddall": 68.2}], "grp": {"p2": 0.02329, "p3": 0.00293, "p4": 0.00059, "mean_group_size": 1.03092, "cut": "ESI 4/5, 15-22h, from 2025-01-01", "share": 0.0561}, "prose": {"toorder": 37, "refasw": 62, "pom": 25, "main15": 32, "main22": 107, "mean1523": 58.1, "mainmean": 50.0, "floor": 8.0, "cut": "2026-08-12", "days": 600, "seeds": 4, "runs": "2,400", "genn": 18, "genpct": 0.87, "urinn": 205, "urinpct": 1.3, "intp": 11.4, "intplo": 4.2, "intphi": 24.1, "intpcov": 99.7, "intpn": 18, "grppct": 2.68, "grpshare": 5.61, "ftspan": "11:00\u201320:00", "peakspan": "19:00\u201320:00", "worstspan": "22:00\u201323:00", "podlo": 66, "podhi": 69, "poduntil": 18, "podwlo": 27, "podwhi": 45, "otherlo": 28, "otherhi": 118, "walkoutpct": 59}};
 
 /* ── engine: a port of tandem()/pooled() from the deck builder ───────────── */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -1193,7 +1205,7 @@ function drawStage(){
   $("stageSent").textContent = st.sent;
   $("stageBar").style.width = (100*PLAY.t/(S.len*60)).toFixed(1) + "%";
   const busy = PLAY.n > PLAY.expect*1.15 ? "a busy one" : PLAY.n < PLAY.expect*0.85 ? "a quiet one" : "a typical one";
-  $("stageHint").innerHTML = `This evening brought <b class="num">${PLAY.n}</b> patients into the lane
+  $("stageHint").innerHTML = `This run brought <b class="num">${PLAY.n}</b> patients into the lane
     against a typical <b class="num">${PLAY.expect.toFixed(1)}</b> — ${busy}.` + (m.id==="split"
       ? ` A space outlined in red holds a patient with nowhere to move on to.`
       : m.id==="bedfirst"
@@ -1217,7 +1229,7 @@ function playPause(on){
     if(!PLAY.trace || PLAY.t >= S.len*60){ buildTrace(); PLAY.t = 0 }
     PLAY.last = 0; PLAY.raf = requestAnimationFrame(tick);
   } else cancelAnimationFrame(PLAY.raf);
-  $("playBtn").textContent = PLAY.on ? "Pause" : (PLAY.t>0 ? "Resume" : "Play the evening");
+  $("playBtn").textContent = PLAY.on ? "Pause" : (PLAY.t>0 ? "Resume" : "Play the day");
   $("reroll").hidden = !PLAY.trace;
 }
 
@@ -1496,6 +1508,7 @@ const bedShareDisplay = (drawn, grp) => {
 };
 
 // Named layouts the group has put forward. Each is a full setting, not a hint.
+let ACTIVE_PRESET = null;   // which named layout is loaded, so the row can show it
 const PRESETS = [
   {id:"mikelong", n:"The Mike Long Play",
    set:{mode:"split", A:2, R:8, assess:44, fastDischarge:true},
@@ -1505,7 +1518,7 @@ const PRESETS = [
    d:"5 spaces in total, split between assessment and results-pending however you like — move one and the other follows."},
   {id:"rooms", n:"8 rooms + 10 chairs",
    set:{mode:"split", A:8, R:10, fastDischarge:true, roomsA:true},
-   d:"The larger estate: assessment in a room, then a second area of 10 chairs."},
+   d:"The bigger footprint: assessment in a room, then a second area of 10 chairs."},
   /* Blake's proposal, on the SAME ten spaces as the 6+4 split and the 10 pooled, so the only
      thing that differs between the three is the rule for who goes where. */
   {id:"blake", n:"The Blake",
@@ -1514,6 +1527,9 @@ const PRESETS = [
    // without his rule. The exclusion list itself is restored by the preset handler below.
    set:{mode:"bedfirst", A:6, R:4, bedIntp:true},
    d:"6 rooms, 4 overflow chairs. A room is the default; chairs are used only once the rooms are full, and the bed-required list never goes vertical."},
+  {id:"sorted", n:"Sorted at the door",
+   set:{mode:"stream", A:3, R:7, bedIntp:true, bedGrp:true},
+   d:"3 rooms and 7 chairs, kept apart: a patient is sent to one side at the door and neither side lends to the other."},
   {id:"six", n:"Group consensus — 6, split",
    set:{mode:"split", A:4, R:2, budget:6},
    d:"6 spaces, divided. Which split is best depends entirely on the assessment time — move that slider and watch the best split move with it."}
@@ -1572,10 +1588,18 @@ function drawModes(){
     `<button type="button" data-m="${m.id}" aria-pressed="${m.id===S.mode}">
        <span class="t">${m.t}</span><br><span class="s">${m.s}</span></button>`).join("");
   $("modes").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    /* ⚠ THE ESTATE IS PRESERVED ACROSS A LAYOUT CHANGE. This folded R into A on the way into
+       pooled and never cleared R, so clicking through the four layouts ratcheted the lane
+       upward — 6+4 became 10, then 10+4, then 12+4 — and the later ones scored better simply for
+       having more spaces. The whole page is "the same ten spaces, different rule"; a physician
+       comparing by clicking the buttons was comparing 10 against 14. */
+    ACTIVE_PRESET = null;                 // a hand-picked layout is no longer a named one
+    const held = S.A + (modeOf().hasR ? S.R : 0);
     S.mode=b.dataset.m; S.budget=0; const m=modeOf();
-  if(m.id==="pooled"){S.A=Math.min(12,S.A+S.R)}
+    if(!m.hasR){ S.A = Math.min(LIM.A[1], held); S.R = 0 }
+    else if(!S.R){ S.A = Math.max(1, held - Math.round(held*0.4)); S.R = held - S.A }
     if(m.id==="split" && S.A+S.R>16){S.A=6;S.R=4}
-    drawModes();drawSpaces();run();
+    drawModes();drawSpaces();drawPresets();run();
   });
 }
 
@@ -1591,6 +1615,7 @@ function syncSpaces(){
 }
 
 function drawSpaces(){
+  /* a named layout stops being loaded the moment the lane is edited by hand */
   const m=modeOf(), rows=[];
   rows.push(ctl("A", m.id==="pooled" ? "Spaces in the group"
                   : m.id==="bedfirst" ? "ED rooms the lane can use"
@@ -1613,6 +1638,7 @@ function drawSpaces(){
     S.roomsA = b.dataset.ra === "1"; drawSpaces(); run() });
   $("spaceCtl").querySelectorAll("input").forEach(i=>{
     i.oninput=()=>{
+      ACTIVE_PRESET = null;
       const k=i.dataset.k, v=+i.value;
       if(S.budget && m.hasR){                       // spend from a fixed pot: one goes up, the other down
         const other = k==="A" ? "R" : "A";
@@ -1802,10 +1828,11 @@ function syncSpeed(m){
 
 function drawPresets(){
   $("presets").innerHTML = PRESETS.map(p=>
-    `<button type="button" data-p="${p.id}"><span class="t">${p.n}</span><br>
+    `<button type="button" data-p="${p.id}" aria-pressed="${ACTIVE_PRESET === p.id}"
+       ><span class="t">${p.n}</span><br>
        <span class="s">${p.d}</span></button>`).join("");
-  $("presets").querySelectorAll("button").forEach(btn=>btn.onclick=()=>{
-    const p=PRESETS.find(x=>x.id===btn.dataset.p);
+  $("presets").querySelectorAll("[data-p]").forEach(btn=>btn.onclick=()=>{
+    const p=PRESETS.find(x=>x.id===btn.dataset.p); ACTIVE_PRESET = p.id;
     S.budget=0; Object.assign(S,p.set);
     // BEDPICK lives outside S, so Object.assign cannot carry it — the same class of bug the
     // board-row loader has hit twice. A preset is a full setting, so it resets the list too.
@@ -1993,8 +2020,8 @@ function drawBoard(){
     // r.cfg is the SANITISED cfg scoreOf ran — a legacy 'zone' row must not print a shape its
     // own score was never computed from
     const shape = r.cfg.mode==="pooled" ? `${r.cfg.A} pooled`
-                : r.cfg.mode==="bedfirst" ? `${r.cfg.A} rm + ${r.cfg.R} ch`
-                : r.cfg.mode==="stream" ? `${r.cfg.A} bed + ${r.cfg.R} ch`
+                : r.cfg.mode==="bedfirst" ? `${r.cfg.A} rooms + ${r.cfg.R} chairs`
+                : r.cfg.mode==="stream" ? `${r.cfg.A} rooms + ${r.cfg.R} chairs, apart`
                 : `${r.cfg.A}+${r.cfg.R}`;
     const big = r.spaces > most;
     return `<tr><td class="num">${i+1}</td><td>${r.who}</td>
@@ -2205,7 +2232,7 @@ function drawBedList(){
     ? sel.filter(x=>!BEDPICK.has(x.i)).reduce((a,x)=>a + x.s*(x.x!=null?x.x:D.g.interp), 0)/tot : 0;
   $("bedSum").innerHTML = `<b class="num">${Math.round(100*eff)}%</b> of the patients this lane
     accepts must have a room &mdash; <b class="num">${Math.round(100*ccPart)}%</b> from the
-    ${bedTicked} complaint${bedTicked===1?"":"s"} ticked on the list${S.bedIntp
+    ${bedTicked === 1 ? "one" : bedTicked} complaint${bedTicked===1?"":"s"} marked on the list${S.bedIntp
       ? `, <b class="num">${Math.round(100*intpPart)}%</b> needing an interpreter` : ``}${S.bedGrp
       ? `, <b class="num">${Math.round(100*(eff-drawn))}%</b> arriving with a sibling` : ``}, plus
     <b class="num">${S.bedExtra}%</b> of everyone else.
@@ -2427,11 +2454,12 @@ function run(){
     $("load").className = "load" + (rho>=1 ? " bad" : rho>0.85 ? " warn" : "");
     const busy = rho * bind.spaces;
     $("load").innerHTML = rho >= 1
-      ? `<b>Too many patients for the ${bind.thing}.</b> Across the whole shift they can get
+      ? `<b>Too many patients for the ${bind.thing}.</b> While the lane is open they can get
          through about <b class="num">${bind.cap.toFixed(0)}</b> patients, and
          <b class="num">${bind.coming.toFixed(0)}</b> are coming. The queue never catches up, so
          people are still waiting when it closes.`
-      : `<b>The ${bind.thing} are the tight spot.</b> On average
+      : `<b>${rho > 0.85 ? `The ${bind.thing} are the tight spot.`
+                         : `The ${bind.thing} fill up first.`}</b> On average
          <b class="num">${busy.toFixed(1)}</b> of your <b class="num">${bind.spaces}</b> are in use.
          That is not <b class="num">${(bind.spaces-busy).toFixed(1)}</b> going spare — patients
          arrive in clusters, so people start waiting well before every one is taken.`;
@@ -2517,7 +2545,8 @@ function run(){
   // the numbers describe another is worse than no stage
   if(PLAY.trace){ PLAY.trace = null; PLAY.runs = null; PLAY.pick = 0; playPause(false); PLAY.t = 0; }
   if(!PLAY.trace){ drawStageIdle(); $("reroll").hidden = true;
-    $("stageHint").textContent = "The same run the numbers come from — one seeded evening, replayed "
+    if(PLAY.expect < 0.05){ $("stageHint").textContent = "Nothing is selected, so nobody arrives."; }
+  else $("stageHint").textContent = "The same run the numbers come from — one recorded day, replayed "
       + "on a clock. A space that looks full is full."; }
   // keep the query string — it carries ?board=, and replacing the URL with a bare hash would
   // drop the shared board from the address bar on the first render
