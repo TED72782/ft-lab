@@ -676,7 +676,12 @@ function bedShareOf(keep, bedKeep, extra, intp, grp){
   /* Interpreter need is a per-PATIENT attribute, not a complaint, so it cannot be a row in the
      list — it is measured per complaint (`x`) and applied to whoever the ticked complaints leave
      behind. Composing on the window-wide 11.4% instead would double-count: the complaints Blake
-     ticks are themselves more non-English than average (14.6% vs 11.1%). And a flat rate would be
+     ticks are themselves more non-English than average (15.3% vs 11.1% on the current ticked set;
+     the 14.6% here predated Dysuria coming off). ⚠ Crosschecked 2026-08-22: this is a marginal
+     rate applied to a residual population, and siblings are enriched among non-English arrivals
+     (8.4% vs 5.3%), so the composed share OVER-states by ~0.2 pp — 23.1% against a measured 22.9%.
+     Left as is: correcting it needs a joint distribution the page does not carry, for a fifth of a
+     point. And a flat rate would be
      wrong the moment anyone narrows the criteria — the per-complaint share runs 4.2% to 24.1%. */
   const intpPart = intp
     ? sel.filter(x=>!bedKeep.has(x.i)).reduce((a,x)=>a + x.s * (x.x!=null ? x.x : D.g.interp), 0) / tot
