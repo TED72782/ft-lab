@@ -1,7 +1,19 @@
 /* captured before anything mutates S — the legacy-link tests below deliberately overwrite
    assessNo with the pre-split fallback, so reading it at the end measures the wrong thing */
 const DEFAULT_ASSESS_NO = S.assessNo;
-setTimeout(()=>{
+/* ⚠ A THROW USED TO LOOK LIKE A PASS. An uncaught exception anywhere below stopped the run dead:
+   the checks after it simply never printed, and since the stated workflow is `grep FAIL`, a screen
+   with 61 "yes" lines and no FAIL read as green while twelve checks had silently vanished. The
+   exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
+   normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
+   a count line — an absent or shrunken count is itself the signal. */
+const EXPECTED_CHECKS = 76;   // raise DELIBERATELY when adding a check
+let CHECKS = 0, LAST = "(none)";
+const _log = console.log.bind(console);
+console.log = (...a) => { const t = String(a[0] ?? "");
+  if(/: *(yes|FAIL|ok)/.test(t + " " + String(a[1] ?? ""))){ CHECKS++; LAST = t.trim() }
+  _log(...a); };
+setTimeout(()=>{ try{
   S.mode="split";S.A=6;S.R=4;S.start=15;S.len=8;S.assess=44;S.fastDischarge=true;S.level=1;
   PICK=new Set(CC.map(x=>x.i)); run(); buildTrace();
   /* ⚠ SWEEP THE RUN, DO NOT SAMPLE ONE MINUTE. These four read the stage at t=300 and printed
@@ -50,7 +62,7 @@ setTimeout(()=>{
   PLAY.t=300.4; drawStage();   // a fraction of a minute later — same occupants
   const after=host.children.map(c=>c);
   const same=before.filter((c,i)=>c===after[i]).length;
-  console.log("occupants unchanged             :", keys===after.map(c=>c.dataset.k).join(",") ? "yes" : "no");
+  console.log("occupants unchanged             :", keys===after.map(c=>c.dataset.k).join(",") ? "yes" : "FAIL — occupants changed between frames");
   console.log("slots REUSED, not rebuilt       :", same+"/"+before.length,
               same===before.length ? "ok" : "FAIL — figures will be invisible while playing");
   // and a slot whose occupant DOES change must be replaced
@@ -214,8 +226,15 @@ setTimeout(()=>{
   console.log("genital group is on the list :", gen && BED_IDS.indexOf(gen.i) >= 0
     ? "yes (" + gen.n + ", " + (100*gen.s).toFixed(2) + "% of the lane)"
     : "FAIL — group missing from BED_IDS");
-  console.log("urinary stayed out of it     :", gen && !/urinary|dysuria|hematuria/i.test(gen.n)
-    && CC.some(x => x.n === "Dysuria") ? "yes (Dysuria is still its own row)" : "FAIL");
+  /* ⚠ THIS WAS A TAUTOLOGY and is kept only as a reminder of the shape. It read
+     `!/urinary|dysuria|hematuria/i.test(gen.n)` — testing the genital ROW'S NAME, which is
+     "Genital & sensitive exam (18)" and can never contain those words — so it was true for every
+     possible program state, including one with Dysuria back on the room list. The property it
+     was meant to assert is now tested for real at "dysuria stays off the room list". What
+     survives here is the weaker thing it actually checked: the urinary complaints still exist as
+     their own rows rather than having been merged away. */
+  console.log("urinary keeps its own rows  :", CC.some(x => x.n === "Dysuria")
+    ? "yes (Dysuria is a row in its own right)" : "FAIL — Dysuria has been merged away");
 
   S.bedIntp = true; BEDPICK = new Set(BED_IDS);
 
@@ -418,8 +437,13 @@ setTimeout(()=>{
          fixture the UI cannot produce. This asserted R survived pooled, which is why the clamp
          that quietly floored R at 1 — growing every pooled lane by a space on reload — sat here
          undetected: the fixture never presented the value that broke. */
-      S.mode=m; S.A=6; S.R=(m==="pooled"?0:4); S.cyc=76; S.assess=44; S.assessNo=51; S.fastDischarge=true;
-      S.start=15; S.len=8; S.level=2; S.bedExtra=7; S.bedIntp=true; S.bedGrp=false;
+      /* ⚠ NO FIXTURE VALUE MAY EQUAL ITS OWN DEFAULT. fromHash defaults to A=6 R=4 assess=44
+         start=15 len=8, and this fixture used exactly those — so a dropped read returned the
+         default, which WAS the expected value, and compared equal. That is how the `cyc` read
+         stayed broken for a day; start, len and assess had the same hole behind them. Every
+         value below now differs from the default AND from the clobber. */
+      S.mode=m; S.A=7; S.R=(m==="pooled"?0:3); S.cyc=90; S.assess=70; S.assessNo=51; S.fastDischarge=true;
+      S.start=9; S.len=13; S.level=2; S.bedExtra=7; S.bedIntp=true; S.bedGrp=false;
       S.turnRoom=13; S.turnChair=2; S.roomsA=(m==="split");
       PICK = narrowed ? new Set([0,1,2]) : new Set(CC.map(x=>x.i));
       BEDPICK = new Set([2,9]);
@@ -690,6 +714,68 @@ setTimeout(()=>{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10t. THE BLANK-IS-ABSENT BRANCH, THE DYSURIA DECISION, AND THE CACHE KEY — three one-line
+          properties that each protect something already got wrong once, and none of which any
+          check touched. */
+  console.log("lim() reads blank as absent :",
+    [null, "", "  ", undefined].every(v => lim("start", v, 15) === 15) && lim("start", 0, 15) === 0
+      ? "yes (null/blank/absent take the default; a real 0 survives)"
+      : "FAIL — " + JSON.stringify([null,"","  ",undefined,0].map(v => lim("start", v, 15))));
+
+  /* the operator removed urinary complaints from the must-have-a-room set on 2026-08-22: they do
+     not usually need a sensitive exam. The old check tested the genital ROW'S NAME for the word
+     "urinary", which it can never contain, so it was true for every possible state. */
+  const dys = CC.find(x => x.n === "Dysuria");
+  console.log("dysuria stays off the room list:", dys && BED_IDS.indexOf(dys.i) < 0
+    ? "yes (a clinical decision, not a derivation)"
+    : "FAIL — Dysuria is back in BED_IDS");
+
+  /* the score cache is keyed on the day level; drop it and every board row keeps its
+     first-computed score when the operator moves the busy-day selector */
+  const cfgC = {mode:"split", A:6, R:4, cyc:76, assess:44, fastDischarge:true,
+                cc:CC.map(x=>x.i).join("."), start:15, len:8};
+  const sQuiet = scoreOf(cfgC, LEVELS[0].pts).score, sHeavy = scoreOf(cfgC, LEVELS[3].pts).score;
+  console.log("the score cache keys on the day:", Math.abs(sQuiet - sHeavy) > 0.5
+    ? "yes (" + sQuiet.toFixed(1) + " quiet vs " + sHeavy.toFixed(1) + " heavy)"
+    : "FAIL — same score on a quiet and a heavy day: " + sQuiet.toFixed(2) + " / " + sHeavy.toFixed(2));
+
+  /* 10u. ⚠⚠ THE PUBLISHED SCORE HAS TO BE PINNED AGAINST SOMETHING THAT IS NOT ITSELF.
+          Every other check that touches the score compares one evaluate() call to another —
+          `board scores what the page does` is evaluate vs scoreOf, and scoreOf CALLS evaluate;
+          `loaded lane reproduces score` is evaluate vs evaluate. Both pin AGREEMENT, not VALUE, so
+          a defect in the formula moves both sides and cancels. Measured: dropping the
+          out-of-window term takes the headline 47.1 -> 25.7 and prints ZERO failures across 71
+          checks. Inverting the in-window share takes it to 75.6. Against a 50.0 do-nothing bar,
+          either inverts the recommendation the physicians are reading.
+          This recomputes the three terms HERE, from the engine's own outputs and the bundled
+          arrival/wait curves, and asserts they reconstruct the reported score. It is deliberately
+          NOT a golden constant: the data cut moves the number every refresh, and a constant would
+          either rot or be re-baselined without thought. What it pins is the FORMULA. */
+  const gl = {mode:"split", A:6, R:4, cyc:76, assess:44, assessNo:44, fastDischarge:true,
+              cc:CC.map(x=>x.i).join("."), start:15, len:8};
+  const GE = evaluate(gl, LEVELS[1].pts);
+  const GB = BARS[gl.bar] || BARS.today;
+  const gWin = new Set(GE.hours);
+  const facG = LEVELS[1].pts / D.day_mean;
+  let outM = 0;
+  for(let h = 0; h < 24; h++)
+    outM += D.lam24[h] * facG * (gWin.has(h) ? (1 - GE.share) : 1) * GB.m24[h];
+  const divM = (GE.o.divByHour || []).reduce((a, v, i) =>
+    a + v * Math.max(0, GB.m24[GE.hours[i]] - D.floor), 0);
+  const laneM = GE.o.idle ? 0 : GE.o.perArrival * GE.accepted;
+  const rebuilt = (laneM + divM + outM) / GE.dayTotal;
+  console.log("the score reconstructs      :", Math.abs(rebuilt - GE.score) < 1e-9
+    ? "yes (" + GE.score.toFixed(2) + " = lane " + (laneM/GE.dayTotal).toFixed(1)
+      + " + turned-away " + (divM/GE.dayTotal).toFixed(1)
+      + " + outside " + (outM/GE.dayTotal).toFixed(1) + ")"
+    : "FAIL — reported " + GE.score.toFixed(3) + ", terms rebuild to " + rebuilt.toFixed(3));
+  /* and each term must actually CARRY weight — a formula can reconstruct perfectly with a term
+     that is silently zero, which is exactly what dropping outMin looks like from inside. */
+  const carries = laneM > 0 && outM > 0 && GE.score > 0;
+  console.log("every term carries weight   :", carries
+    ? "yes (lane " + laneM.toFixed(0) + ", outside " + outM.toFixed(0) + " patient-min)"
+    : "FAIL — lane " + laneM.toFixed(0) + ", turned-away " + divM.toFixed(0) + ", outside " + outM.toFixed(0));
+
   /* 10v. AN OMITTED FIELD AND AN EXPLICIT null MUST SCORE THE SAME. The two backends disagree by
           construction — serve_board.py writes an explicit JSON null for any key the posting page
           omitted, Apps Script omits it — so every optional field has to treat the two identically
@@ -931,4 +1017,12 @@ setTimeout(()=>{
     if(i >= 0) sample = a.slice(i, i+230).replace(/\s+/g," ");
   }
   console.log("\nsample markup:", sample || "(no full slot in the whole run — check drawStage)");
+  }catch(err){
+    _log("FAIL — harness ABORTED after \"" + LAST + "\": " + err.message);
+    _log(err.stack ? err.stack.split("\n").slice(0,3).join("\n") : "");
+  }finally{
+    _log("--- " + CHECKS + " checks ran ---");
+    if(CHECKS < EXPECTED_CHECKS)
+      _log("FAIL — only " + CHECKS + " of " + EXPECTED_CHECKS + " checks ran; the rest never executed");
+  }
 },60);
