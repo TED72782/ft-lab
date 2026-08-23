@@ -101,7 +101,7 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 #tabNotes h2{font-size:15px;letter-spacing:.02em;margin:0 0 12px;color:var(--ink-2);
   text-transform:uppercase}
 #tabNotes:focus-visible,#tabLab:focus-visible{outline:none}
-.seg{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+/* (the .seg rule lives further down — merged there, see the note) */
 .seg-l{font-size:12.5px;color:var(--ink-2)}
 .seg button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;
   padding:4px 10px;font-size:12.5px;color:var(--ink)}
@@ -128,16 +128,23 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--hold)}
   font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.02em}
 .stat .k{font-size:12px;color:var(--ink-3);margin-top:3px}
 .stat.is-hold .v{color:var(--hold)} .stat.is-breach .v{color:var(--breach)}
-/* the stream boards mark a breached figure on the .num itself, not on a .stat wrapper —
-   without this the red never applied and a room stream carrying 94 min a patient rendered
-   in normal ink. */
-.num.is-breach{color:var(--breach)}
+/* ⚠ NO .num.is-breach RULE, DELIBERATELY. A previous sweep found this class inert on the stream
+   boards and "fixed" the CSS so the red would apply. That was backwards: the two call sites
+   reddened above 60 min and above 1 patient turned away — thresholds nobody declared, on a page
+   whose whole argument is that it has no pass mark and that what counts as acceptable is the
+   reader's to argue. Dead code that would assert an undeclared verdict gets deleted, not
+   switched on. The class is gone from both call sites too. */
 
 .load{margin:-6px 0 16px;padding:10px 14px;border-radius:8px;font-size:13px;
   background:var(--surface-2);border:1px solid var(--line-soft);color:var(--ink-2)}
 .load.warn{background:var(--breach-wash);border-color:var(--breach)}
 .load.bad{background:var(--breach-wash);border-color:var(--breach);color:var(--ink)}
-.seg{display:flex;gap:6px;margin-top:8px}
+/* ⚠ ONE .seg RULE. There were two — an earlier one carrying flex-wrap, align-items and a
+   margin, and this one — with the same specificity and neither in a media query, so this one
+   won and all three of those properties were silently dead. It did not show until the sort
+   segment grew to four buttons, which then compressed into slivers on a phone instead of
+   wrapping. Merged; do not re-declare .seg above. */
+.seg{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px}
 .seg button{all:unset;cursor:pointer;flex:1;text-align:center;font-size:12px;padding:7px 6px;
   border:1px solid var(--line);border-radius:7px;background:var(--surface-2);color:var(--ink-2)}
 .seg button[aria-pressed="true"]{border-color:var(--hold);background:var(--hold-wash);color:var(--ink);font-weight:600}

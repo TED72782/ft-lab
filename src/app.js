@@ -513,8 +513,8 @@ function playPause(on){
    The lane used to be nailed to 15:00-23:00. It is now a start hour and a length, because
    WHERE you put the window turns out to matter more than how you split the chairs — and the
    arrival curve and today's wait curve disagree about where the need is. Arrivals peak at
-   19:00-20:00 (3.9/hr) with a second bump at 11:00; today's wait peaks later still, 107 min at
-   22:00 and 99 at midnight, and is lowest at 08:00 (16 min). A window over the busiest ARRIVAL
+   19:00-20:00 (3.9/hr) with a second bump at 11:00; today's wait peaks later still, 109 min at
+   23:00 and 107 at 22:00, and is lowest at 08:00 (16 min). A window over the busiest ARRIVAL
    hours is not automatically the one that removes the most waiting.
 
    The day is the denominator now. Patients arriving outside the lane's hours are charged the
@@ -707,7 +707,7 @@ const MODES = [
    needs a door are recorded somewhere and merely absent from THIS extract:
      - GU concerns are recorded at triage, but this build breaks out only Dysuria; the rest
        (genital, scrotal, testicular, vaginal, hematuria, frequency) are swallowed by the
-       227-complaint bucket, a quarter of the volume and so useless as a proxy.
+       209-complaint bucket, a quarter of the volume and so useless as a proxy.
      - Preferred language / interpreter need is a REGISTRATION field, taken at the desk rather
        than judged at the bedside. Nothing about it is soft; it just was not extracted.
    Both are pipeline limits, fixable in the next cut, and both would turn slider guesses into
@@ -802,7 +802,7 @@ const PRESETS = [
    // link leaves the criterion off, so without this "The Blake" would silently be his layout
    // without his rule. The exclusion list itself is restored by the preset handler below.
    set:{mode:"bedfirst", A:6, R:4, bedIntp:true},
-   d:"6 rooms, 4 overflow chairs. A room is the default; chairs are used only once the rooms are full, and the bed-required list never goes vertical."},
+   d:"6 rooms, 4 overflow chairs. A room is the default; chairs are used only once the rooms are full, and the patients who must have a room never get a chair."},
   {id:"sorted", n:"Sorted at the door",
    set:{mode:"stream", A:3, R:7, bedIntp:true, bedGrp:true},
    d:"3 rooms and 7 chairs, kept apart: a patient is sent to one side at the door and neither side lends to the other."},
@@ -830,8 +830,8 @@ const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
               on the reading that a no-test patient can only leave the assessment space once the
               call is made. Operator, 2026-08-22: they can move as soon as the ASSESSMENT is done,
               which is somewhere inside the doctor's time and is recorded nowhere. What the data
-              bounds is a BAND: no earlier than the doctor arriving (~27 min after rooming), no
-              later than the decision (~67). 44 sits inside it. The band is shown on screen; this
+              bounds is a BAND: no earlier than the doctor arriving (~20 min after rooming), no
+              later than the decision (~61). 44 sits inside it. The band is shown on screen; this
               number is the operator's to set, not the data's. */
            assessNo: 44};
 
@@ -1045,7 +1045,8 @@ function drawSpeed(m){
       <input type="range" id="cyc" min="55" max="115" step="1" value="${S.cyc}">
       <div class="hint">Nobody is moved in this layout, so one space &mdash; room or chair &mdash;
         carries the whole visit, ${Math.round(D.hold_all)} min on average today. A pace, not a
-        duration. Who goes to a bed is set in <b>the exclusion list</b> below.</div></div>`;
+        duration. Who needs a room is set on the complaint list below &mdash; tap <b>room</b> on a
+      row &mdash; and in <b>Who needs a room</b> beneath it.</div></div>`;
     $("cyc").oninput = e => { S.cyc = +e.target.value; syncSpeed(m); requestRun() };
     return syncSpeed(m);
   }
@@ -1264,7 +1265,7 @@ function sane(cfg){
           // entries saved before the window was adjustable ran the original 15:00-23:00 lane
           start:lim("start",cfg.start,15), len:lim("len",cfg.len,8), cc:cfg.cc};
 }
-/* ⚠ A ROW IS ONLY RE-SCORED WHEN ITS ANSWER CAN HAVE CHANGED. Each call simulates 900 evenings
+/* ⚠ A ROW IS ONLY RE-SCORED WHEN ITS ANSWER CAN HAVE CHANGED. Each call simulates 600 days x 4 seeds
    (~13 ms), and drawBoard() re-runs EVERY row — a board that has collected a hundred lanes over
    a few sessions froze the page for over a second each time the day or the bar moved. Only the
    row, the day and the bar are inputs, so the result keys on exactly those. */
@@ -1614,8 +1615,9 @@ function drawCriteria(){
     <span class="dim">&ldquo;Doctor to decision&rdquo; is how long from the doctor arriving to the
     call being made, and it is shown <b>twice, for two different groups of patients</b>.
     <b>Without a test</b> (${Math.round(D.g.dd)} min on average) is the clean chair case &mdash; but
-    it is a minority of most complaints, and which patients skip a test differs by complaint, so it
-    flatters some more than others. <b>Across everyone</b> (${Math.round(D.g.ddall)} min) covers
+    it is a minority of the higher-volume complaints and the majority of several others &mdash;
+    the test rate on each row tells you which &mdash; and which patients skip a test differs by
+    complaint, so it flatters some more than others. <b>Across everyone</b> (${Math.round(D.g.ddall)} min) covers
     every patient with that complaint, but roughly half of it is time spent waiting on a result
     rather than on the doctor. Neither is the whole answer; they are side by side so you can see
     where they disagree. The long ones either way are where something is DONE &mdash; a repair, a
@@ -1641,7 +1643,7 @@ function drawCriteria(){
      Both are `dd` now, and `dd` is the right one to rank chair candidates on: 44-68% of `ddall`
      elapses before the first RESULT lands — 66-68% for finger, ankle, arm and musculoskeletal —
      so ranking on it puts the extremity complaints at the slow end and invites excluding exactly
-     the patients a chair suits. `dd` is a minority of each complaint, which is why the row names
+     the patients a chair suits. `dd` is a minority of most complaints, though the majority of several, which is why the row names
      its population; the fix for two populations side by side is to label them, not to swap in a
      number that measures waiting for radiology. Rows with too few no-test patients fall back to
      the lane figure and show a dash. */
@@ -1822,8 +1824,8 @@ function run(){
       <div class="strm-h">${name} <span class="dim">· ${spaces} space${spaces===1?"":"s"} · ${who}</span></div>
       <div class="strm-row">
         <div><b class="num">${st.n.toFixed(1)}</b><span>arrive here</span></div>
-        <div><b class="num ${st.wait > 60 ? "is-breach" : ""}">${st.wait.toFixed(1)}</b><span>min each, waiting for a space</span></div>
-        <div><b class="num ${st.diverted > 1 ? "is-breach" : ""}">${st.diverted.toFixed(1)}</b><span>still waiting at close</span></div>
+        <div><b class="num">${st.wait.toFixed(1)}</b><span>min each, waiting for a space</span></div>
+        <div><b class="num">${st.diverted.toFixed(1)}</b><span>still waiting at close</span></div>
         <div><b class="num">${st.peak.toFixed(1)}</b><span>at once at its busiest, of ${spaces}</span></div>
       </div></div>`).join("")
     + `<div class="strm-note">Neither side lends to the other, so these are two queues, not one.
@@ -1843,7 +1845,7 @@ function run(){
         lane's stream — but it reads as "got a chair", two cards from one counting who did not. */
      o.idle ? "nobody in the lane"
             : "minutes per patient the lane sees, including those it sends away", ""],
-    [`${Math.round(100*E.cover)}%`, `of the day's ${lvl.pts} patients go through the lane`, ""],
+    [`${Math.round(100*E.cover)}%`, `of the day's ${lvl.pts} ESI 4/5 patients go through the lane`, ""],
     [o.idle ? "everyone" : `${o.diverted.toFixed(1)}`,
      o.idle ? "the lane takes nobody, so the main department sees them all"
             : "still waiting when it closes — sent to the main department", ""],
@@ -1871,7 +1873,7 @@ function run(){
     (${_B.m24[_lo].toFixed(0)}) and worst at ${_hi}:00 (${_B.m24[_hi].toFixed(0)}).`;
   drawLevels(E);
   /* ⚠ Neither of these depends on the slider being dragged. drawBoard RE-SIMULATES every saved
-     entry (900 evenings each) and only its day/bar can change the answer; drawCriteria rebuilds
+     entry (600 days x 4 seeds each) and only its day/bar can change the answer; drawCriteria rebuilds
      25 buttons and only the hours and the day move its numbers. Redrawing both on every pointer
      move was most of the stutter. Keyed, so they run when they can actually differ. */
   /* ⚠ the mode and the bed list belong in this key now. The complaint list carries the bed chips,
@@ -1889,7 +1891,7 @@ function run(){
   if(PLAY.trace){ PLAY.trace = null; PLAY.runs = null; PLAY.pick = 0; playPause(false); PLAY.t = 0; }
   if(!PLAY.trace){ drawStageIdle(); $("reroll").hidden = true;
     if(PLAY.expect < 0.05){ $("stageHint").textContent = "Nothing is selected, so nobody arrives."; }
-  else $("stageHint").textContent = "The same run the numbers come from — one recorded day, replayed "
+  else $("stageHint").textContent = "The same run the numbers come from — one simulated day, replayed "
       + "on a clock. A space that looks full is full."; }
   // keep the query string — it carries ?board=, and replacing the URL with a bare hash would
   // drop the shared board from the address bar on the first render
@@ -1915,7 +1917,7 @@ function drawLevels(E){
   $("levels").innerHTML = LEVELS.map((l,i)=>{
     const on = i===S.level;
     return `<div class="lv" data-i="${i}" aria-current="${on}" role="button" tabindex="0">
-      <div class="n">${l.n}</div><div class="d">${l.pts} patients · ${l.d}</div>
+      <div class="n">${l.n}</div><div class="d">${l.pts} ESI 4/5 patients · ${l.d}</div>
       <div class="r">${on ? E.score.toFixed(1)+" min per arrival" : "&nbsp;"}</div></div>`;
   }).join("");
   $("levels").querySelectorAll(".lv").forEach(el=>{

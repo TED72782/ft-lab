@@ -63,15 +63,16 @@
         <div class="ahours" id="arrHours"></div>
         <div id="winCtl"></div>
         <div class="anote" id="arrNote"></div>
-        <div class="ahint">Today's fast track runs roughly {{ftspan}}. Arrivals peak at
-          {{peakspan}}; the longest waits are at {{worstspan}}, as it closes.</div>
+        <div class="ahint">Today's fast track runs roughly {{ftspan}}, and takes the bulk of
+          these patients until {{poduntil}}:00. Arrivals peak at {{peakspan}}. The longest waits
+          come later, after it has closed &mdash; {{worsthr}}:00, at {{worstmin}} minutes.</div>
       </div>
     </section>
 
     <section class="panel stage" style="margin-top:14px">
       <div class="stage-h">
         <div><div class="eyebrow">One day, played out</div>
-          <div class="stage-sub" id="stageHint">The same run the numbers come from — one seeded
+          <div class="stage-sub" id="stageHint">The same run the numbers come from — one simulated
             day, replayed on a clock. A space that looks full is full.</div></div>
         <div class="stage-ctl">
           <span class="clock num" id="stageClock">--:--</span>
@@ -133,8 +134,8 @@
       <div class="seg" id="ccSortSeg">
         <div class="seg-l">Order</div>
         <button type="button" data-sort="vol">by how many arrive</button>
-        <button type="button" data-sort="fast">fastest &mdash; no test</button>
-        <button type="button" data-sort="fastall">fastest &mdash; all patients</button>
+        <button type="button" data-sort="fast">fastest &mdash; without a test</button>
+        <button type="button" data-sort="fastall">fastest &mdash; across everyone</button>
         <button type="button" data-sort="test">fewest tests first</button>
       </div>
       <div class="crit-list" id="ccList"></div>
@@ -151,8 +152,9 @@
           <button type="button" id="bedNone" class="mini">Clear</button>
         </div>
       </div>
-      <div class="crit-hint">Which complaints need a bed is set on the complaint list above
-        &mdash; tap <b>room</b> on a row. These are the reasons <i>no</i> complaint records.
+      <div class="crit-hint">Which complaints need a room is set on the complaint list above
+        &mdash; tap <b>room</b> on a row. What is here instead is everything that is not a chief
+        complaint: two measured from other fields, and one only the group can put a number on.
         <b>A starting point, not an answer</b>: this is the list the MD group has to establish and
         sign off. <span class="dim">What the complaint field can and cannot see is in
         <b>Notes &amp; method</b>.</span></div>
@@ -162,7 +164,7 @@
           see, and what is deliberately absent &mdash; is in <b>Notes &amp; method</b> at the top.</p>
         <div id="bedExtraCtl"></div>
       </div>
-      <div class="crit-f">The parts add up, and the total above is what the page runs.</div>
+      <div class="crit-f">The total above is what the page runs.</div>
     </section>
 
     <section class="panel board">
@@ -230,23 +232,27 @@
         normaliser so <i>Febrile</i> and <i>Fever</i> are one complaint rather than two.
         Volumes and test rates are measured per complaint; the SHAPE of the service times is
         department-wide, scaled to each complaint's own mean. The mix itself is measured on
-        15:00&ndash;23:00 and applied to whatever window you pick &mdash; close for any daytime or
-        15:00&ndash;23:00 window it was measured on, but an overnight lane would see a different mix than this assumes.</div>
+        15:00&ndash;23:00 and applied to whatever window you pick. It is close for any daytime window,
+        and exact for the 15:00&ndash;23:00 one it was measured on &mdash; but an overnight lane
+        would see a different mix from the one this assumes.</div>
     </div>
     <div class="note">
       <h3>The exclusion list — what the complaint field can and cannot see</h3>
       <div class="crit-hint">Presentations that need a door for the initial evaluation, and so
-        wait for a room rather than take a chair. Tap a complaint to add or remove it. The three
+        wait for a room rather than take a chair. Tap <b>room</b> on a complaint's row to add or
+        remove it &mdash; tapping the complaint itself takes it out of the lane instead. The three
         ticked to start are the ones Blake named that a chief complaint can actually carry
         &mdash; abdominal pain, rash, and the genital complaints as a group. <b>That is a starting point, not an answer:</b>
         this is the list the MD group has to establish and sign off, and it is a clinical
         judgement rather than anything the data can settle.</div>
     </div>
     <div class="note">
-      <h3>How the bed-required share is composed</h3>
-      <div class="crit-f">The two parts add up: the complaints you tick, plus this share of
-        everyone else the lane accepts. That total is what the page runs &mdash; it is shown
-        above the list, and it is the number worth arguing about.</div>
+      <h3>How the must-have-a-room share is built up</h3>
+      <div class="crit-f">Three measured parts, then one you set: the complaints you tick, the
+        patients needing an interpreter, and the patients arriving with a sibling &mdash; then this
+        share of whoever is left. The last one is a rate on the remainder, so the four figures do
+        not sum to the total. The total above the list is what the page runs, and it is the number
+        worth arguing about.</div>
     </div>
     <div class="note">
       <h3>What this does and does not know</h3>
@@ -256,7 +262,9 @@
             2025 onward. Nothing here is invented except the assumptions flagged in the next
             item.</li>
         <li><b>Families arrive together, and the lane takes the whole family or none of it.</b>
-            <b>{{grpshare}}%</b> of the children in these hours arrive with a sibling &mdash;
+            <b>{{grpshare}}%</b> of the children arriving between 15:00 and 22:00 &mdash; the
+            window this was measured on, whatever hours you give the lane &mdash; arrive with a
+            sibling &mdash;
             mostly pairs, a few threes. That is measured, not assumed: reshuffling arrival times
             among the same surnames puts the coincidence rate near zero. It matters because two
             siblings need two spaces <i>at the same moment</i>, and a lane that seats one and
@@ -318,7 +326,7 @@
             registration and the start of triage &mdash; {{floor}} minutes on average here, barely varying
             across the day. That is added to every lane wait, because the figure it is
             compared against &mdash; today's arrival-to-room &mdash; contains it too. Without it
-            the lane was being credited with about 8 minutes it never saves.</li>
+            the lane was being credited with {{floor}} minutes it never saves.</li>
         <li><b>It assumes the main department is unaffected.</b> Taking work out of it should make
             its wait shorter, which this does not model &mdash; so if anything the score
             understates what excluding patients costs.</li>
@@ -340,7 +348,7 @@
             at all, and half a day's delay can land in a single hour — which is why the worst
             hour is shown separately. Two layouts a minute or two apart are not reliably in that
             order; rerun them and they can swap.</li>
-        <li><b>The bed-first layout is scored on delay, and that is not the case for it.</b>
+        <li><b>The rooms-first layout is scored on delay, and delay is not the argument for it.</b>
             "Rooms first, chairs only when rooms are full" was proposed for privacy, for a more
             thorough initial evaluation behind a door, and for cutting the handoffs and forgotten
             tasks that come from moving a patient mid-visit. <b>None of those are in this model.</b>
@@ -355,7 +363,7 @@
             only the people doing triage can put a number on. Move the slider to yours.</li>
         <li><b>A room and a chair are treated as taking the same time.</b> If an evaluation behind
             a door is genuinely faster or more thorough than one in a chair, that is not modelled
-            &mdash; nothing measures it. It would help the bed-first layout if true. The same gap
+            &mdash; nothing measures it. It would help the rooms-first layout if true. The same gap
             applies to an interpreted encounter, which plausibly runs longer than the measured
             mean: the model sends those patients to a room but still gives them an average visit,
             so it captures the space they need and not the time.</li>
@@ -369,7 +377,8 @@
             <div class="note">
       <h3>Genital complaints are their own row now &mdash; urinary ones are not in it</h3>
         <p>The sensitive-area half of Blake&rsquo;s rule has its own row &mdash;
-          <b>{{genn}} complaints</b>, <b>{{genpct}}%</b> of the lane &mdash; small enough to mark
+          <b>{{genn}} complaint labels</b> merged into one row, <b>{{genpct}}%</b> of the lane
+          &mdash; small enough to mark
           as needing a room without putting a quarter of the department in one.</p>
         <p><b>Urinary complaints are deliberately not in that group.</b> Dysuria, hematuria and
           urinary frequency or retention &mdash; <b>{{urinn}} visits, {{urinpct}}%</b> &mdash;
@@ -381,7 +390,7 @@
     <div class="note">
       <h3>An interpreter is measured, not guessed</h3>
         <p><b>{{intp}}% of this lane records a preferred language other than English</b> &mdash; taken
-          at registration, not judged at the bedside, and present for <b>{{intpcov}}%</b> of the
+          at registration, not judged at the bedside, and recorded for <b>{{intpcov}}%</b> of the visits in the
           window across <b>{{intpn}}</b> languages. Reading that as needing an interpreter is a
           judgement, not a count &mdash; but it is a recorded field rather than a guess, which is
           what separates it from the share below. An interpreted evaluation has to be audible and private, and an interpreter
@@ -393,8 +402,9 @@
     </div>
     <div class="note">
       <h3>A sibling in the room, not a chair each</h3>
-        <p><b>{{grpshare}}% of the children arriving in these hours come with a sibling</b>, and
-          measured in the record rather than assumed &mdash; reshuffling arrival times among the
+        <p><b>{{grpshare}}% of the children arriving between 15:00 and 22:00 come with a
+          sibling</b> &mdash; that window, not whatever hours you give the lane. It is measured in
+          the record rather than assumed &mdash; reshuffling arrival times among the
           same surnames puts the coincidence rate near zero. They are ticked as needing a room,
           because a family goes into one room together rather than into separate chairs across the
           lane, and because the lane takes the whole family or none of it.</p>
