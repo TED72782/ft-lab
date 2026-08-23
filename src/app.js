@@ -87,6 +87,7 @@ function sim(cfg){
       const slotA = T ? new Int16Array(arr.length).fill(-1) : null;
       const slotB = T ? new Int16Array(arr.length).fill(-1) : null;
       let ab=0, rb=0, peak=0;
+      const seated = new Int32Array(gnext);      // members of each party that have arrived
       /* ab+rb is every patient occupying a space — including one stuck in assessment with
          nowhere to move to. That total IS the physician's concurrent load. Capacity is A+R;
          the peak is what the lane actually reached, which is the honest number to show. */
@@ -174,7 +175,12 @@ function sim(cfg){
          of how nursing is assigned, and this prices it. */
       const seatBedParty = (t, idx) => { for(let j=idx.length-1;j>=0;j--){
           const q=qa.splice(idx[j],1)[0]; rec(q[1], t-q[0]);
-          const toBed = stream ? bedReq[q[1]] : (ab<A && (bedReq[q[1]] || rb>=R));
+          /* ⚠ ROOMS FIRST FOR EVERYONE in bed-first — that is what the layout IS. This read
+             `ab<A && (bedReq || rb>=R)`, which sends a chair-eligible patient to a bed only once
+             every chair is full: the preference inverted, and the mode's own title, stage label
+             and hint all promised the opposite. It made Blake's rule look cheaper than it is —
+             at 2 rooms + 8 chairs, 15.6 min/patient against a true 22.3. */
+          const toBed = stream ? bedReq[q[1]] : (ab < A);
           if(toBed) startBed(t,q[1]); else startChair(t,q[1]) } };
       const takeParty = t => {
         for(let i=0;i<qa.length;i++){
@@ -204,7 +210,12 @@ function sim(cfg){
                            bed-required rule in its own right and not a share to be added. The
                            draw is kept for everyone else. */
                         bedReq[tag] = (bedGrp && gsz[tag] > 1) || r() < bedShare ? 1 : 0;
-                        qa.push([t,tag]); drain(t) }        // queue then drain, so nobody jumps
+                        qa.push([t,tag]);
+                        /* ⚠ WAIT FOR THE WHOLE PARTY. Each member is its own arrival event at the
+                           same instant, so draining on the first one seated it alone and the
+                           whole-party rule almost never bit — 17% of pairs and a third of triples
+                           were still split. Drain once the last member has arrived. */
+                        if(++seated[gid[tag]] === gsz[tag]) drain(t) }
           else if(kind===1 || kind===2){ seen++;
                  if(T) T.push({t, id:tag, ev:"leave"});
                  if(kind===1) releaseA(t,tag); else releaseB(t,tag) }
@@ -216,7 +227,8 @@ function sim(cfg){
           continue;
         }
         if(kind===0){ if(T) T.push({t, id:tag, ev:"arrive", test: null});
-                      qa.push([t,tag]); takeNext(t) }
+                      qa.push([t,tag]);
+                      if(++seated[gid[tag]] === gsz[tag]) takeNext(t) }   // whole party, see above
         else if(kind===1){
           seen++;
           // ⚠ the assessment space is released on a MOVE too, not only on a departure — it still
@@ -569,7 +581,7 @@ function evaluate(cfg, dayTotal){
            bedShare: cfg.bedcc === undefined && cfg.bedShare !== undefined
              ? Math.min(1, Math.max(0, (+cfg.bedShare || 0) / 100))
              : bedShareOf(keep, cfg.bedcc === undefined ? new Set(BED_IDS) : idSet(cfg.bedcc),
-                          cfg.bedExtra, cfg.bedIntp, cfg.bedGrp),
+                          cfg.bedExtra, cfg.bedIntp),
            assessMin:cfg.assess, fastDischarge:cfg.fastDischarge, shr:w("w"), lam,
            /* Scaled by the mix, exactly as the service pools are. A lane that takes only quick
               complaints gets a shorter no-test assessment automatically, because those patients
@@ -689,14 +701,24 @@ function bedShareOf(keep, bedKeep, extra, intp, grp){
   /* Siblings compose the same way and for the same reason: a child arriving with a sibling needs
      a door whatever the complaint, so it applies to whoever the earlier two rules leave behind
      rather than adding to them. The share is measured (D.grp.share), not drawn. */
-  const grpShare = (D.grp && D.grp.share) || 0;
-  const grpPart = grp ? (1 - Math.min(1, ccPart + intpPart)) * grpShare : 0;
-  const placed = Math.min(1, ccPart + intpPart + grpPart);
+  /* ⚠ NO SIBLING TERM HERE. sim() forces every member of a party into a bed structurally, from
+     the group size it already knows, so folding the measured sibling share in as well charged
+     siblings twice AND drew everyone else at an inflated rate: the panel said 22.8% while the
+     engine realised 27.2%. It cost chair-heavy lanes most — 2rm+8ch read 23.5 min/patient against
+     a true 20.2. This returns the share the ENGINE needs; `bedShareDisplay` composes the figure a
+     reader sees, which includes siblings because the lane really does put them in beds. */
+  const placed = Math.min(1, ccPart + intpPart);
   return Math.min(1, placed + (1-placed) * (extra||0)/100);
 }
 const idSet = v => new Set(String(v).split(".").filter(x=>x!=="").map(Number));
 // the same figure for the lane on screen
-const liveBedShare = () => bedShareOf(PICK, BEDPICK, S.bedExtra, S.bedIntp, S.bedGrp);
+const liveBedShare = () => bedShareOf(PICK, BEDPICK, S.bedExtra, S.bedIntp);
+/* What a reader sees: the share the engine actually realises. sim() marks a patient bed-required
+   if their party is bigger than one OR the draw succeeds, so the two compose as 1-(1-g)(1-b). */
+const bedShareDisplay = (drawn, grp) => {
+  const g = grp ? (D.grp && D.grp.share) || 0 : 0;
+  return 1 - (1 - g) * (1 - drawn);
+};
 
 // Named layouts the group has put forward. Each is a full setting, not a hint.
 const PRESETS = [
@@ -875,10 +897,16 @@ function fdControl(){
 let speedKey = null;
 /* ⚠ BUILT ONCE. Same rule as every other slider on this page: re-rendering an <input> inside its
    own oninput replaces the element under the pointer and kills the drag after one step. */
+let turnBuilt = false, bedxBuilt = false;
 function drawTurn(){
   const host = $("turnCtl");
   if(!host) return;
-  if(!$("trn")){
+  /* ⚠ a FLAG, not a DOM probe. `if(!$("trn"))` reads as "build it once", and in a browser it is —
+     but the headless harness creates an element on first lookup, so the probe was always false,
+     the markup was never written and the handler never wired. The sliders shipped untested for
+     that reason. Same pattern as winBuilt below. */
+  if(!turnBuilt){
+    turnBuilt = true;
     host.innerHTML =
       `<div class="ctl"><div class="ctl-top">
          <label for="trn">Turning over a room</label><output class="num" id="trnOut"></output></div>
@@ -1251,13 +1279,23 @@ function hashState(){
      so a link from any other layout keeps the shape it has always had. */
   // fields 10-12: criteria, the bed-required list, the residual share. Only the layout that has
   // an exclusion list carries one, and an empty field holds its place so older links still parse.
-  const bed = S.mode==="bedfirst" || S.mode==="stream";
-  if(PICK.size < CC.length || bed) c.push(PICK.size < CC.length ? [...PICK].sort((x,y)=>x-y).join(".") : "");
-  if(bed){ c.push([...BEDPICK].sort((x,y)=>x-y).join(".")); c.push(String(S.bedExtra));
-           c.push(S.bedIntp ? "1" : "0"); c.push(S.bedGrp ? "1" : "0") }
-  // turnover applies to every layout, so it rides on all links, after the bed-first block
-  c.push(String(S.turnRoom)); c.push(String(S.turnChair)); c.push(S.roomsA ? "1" : "0");
-  c.push(String(S.assessNo));
+  /* ⚠ FIXED WIDTH FROM 2026-08-22. Fields 9-13 used to be written ONLY when they applied — the
+     criteria only when narrowed, the bed block only in a bed layout — so a plain split lane wrote
+     13 fields and the reader, which assumed 14, took field 9 (the turnover minutes) as the
+     CRITERIA LIST. A default lane came back as "Breathing Difficulty only", scoring 49.5 against
+     a 50.0 bar: the page told a physician the fast track was worthless. And run() writes the hash
+     on every recompute, so a plain refresh did it, not just a shared link.
+     Every field is written now, empty where it does not apply, and the reader indexes a known
+     layout. Cheap in characters, and there is no arithmetic left to get wrong. */
+  c.push(PICK.size < CC.length ? [...PICK].sort((x,y)=>x-y).join(".") : "");   // 9  criteria
+  c.push([...BEDPICK].sort((x,y)=>x-y).join("."));                             // 10 bed list
+  c.push(String(S.bedExtra));                                                  // 11
+  c.push(S.bedIntp ? "1" : "0");                                               // 12
+  c.push(S.bedGrp ? "1" : "0");                                                // 13
+  c.push(String(S.turnRoom));                                                  // 14
+  c.push(String(S.turnChair));                                                 // 15
+  c.push(S.roomsA ? "1" : "0");                                                // 16
+  c.push(String(S.assessNo));                                                  // 17
   return c.join(",");
 }
 function toHash(){
@@ -1281,24 +1319,27 @@ function fromHash(){
                     assess:lim("assess",p[4],44), fastDischarge:p[5]==="1", level:lvl, budget:0,
                     start: p.length>=9 ? lim("start",p[7],15) : 15,
                     len:   p.length>=9 ? lim("len",p[8],8)    : 8});
-  if(p.length>=10 && p[9] !== "") PICK = new Set(p[9].split(".").filter(v=>v!=="").map(Number));
-  BEDPICK = p.length>=11 && p[10] !== "" ? idSet(p[10]) : new Set(BED_IDS);
-  S.bedExtra = p.length>=12 ? lim("bedExtra", p[11], 0) : 0;
-  // a link written before the criterion existed described a lane scored without it
-  S.bedIntp  = p.length>=13 ? p[12] === "1" : false;
-  S.bedGrp   = p.length>=14 ? p[13] === "1" : false;
-  /* ⚠ the turnover pair sits at a different offset depending on whether the bed-first block is
-     present, which is why it is read from the END rather than by index. A link written before
-     turnover existed described a lane with none. */
-  const min2 = (p[0]==="bedfirst" || p[0]==="stream") ? 16 : 12;   // links with the turnover pair
-  const tail = p.length >= min2+2 ? p.slice(-4)     // …rooms flag, then the no-test assessment
-             : p.length >= min2+1 ? [...p.slice(-3), ""]
-             : p.length >= min2   ? [...p.slice(-2), "0", ""]
-             : null;
-  S.turnRoom  = tail ? lim("turnRoom", tail[0], 0) : 0;
-  S.turnChair = tail ? lim("turnChair", tail[1], 0) : 0;
-  S.roomsA    = tail ? tail[2] === "1" : false;
-  S.assessNo  = lim("assessNo", tail && tail[3], S.assess);
+  /* Fixed layout since 2026-08-22 (see hashState). A link written before a field existed is
+     SHORTER, and each default below is what that lane MEANT when it was written — no turnover,
+     no interpreter or sibling rule, one assessment time for both halves. Read by index; the
+     old read-from-the-end rule mis-parsed any link whose optional blocks were absent. */
+  const at = (i, dflt) => p.length > i && p[i] !== "" ? p[i] : dflt;
+  /* ⚠ an empty criteria field means EVERY complaint, so it must RESET PICK, not leave it. A link
+     is a full setting, like a preset — landing on an unnarrowed link while narrowed kept the old
+     narrowing and scored a lane the link did not describe. */
+  PICK = at(9, "") !== "" ? new Set(String(p[9]).split(".").filter(v=>v!=="").map(Number))
+                          : new Set(CC.map(x=>x.i));
+  BEDPICK    = at(10, "") !== "" ? idSet(p[10]) : new Set(BED_IDS);
+  S.bedExtra = lim("bedExtra",  at(11, 0), 0);
+  S.bedIntp  = at(12, "0") === "1";
+  S.bedGrp   = at(13, "0") === "1";
+  S.turnRoom  = lim("turnRoom",  at(14, 0), 0);
+  S.turnChair = lim("turnChair", at(15, 0), 0);
+  S.roomsA    = at(16, "0") === "1";
+  /* ⚠ lim() must not be handed a null: +null is 0, which is finite, so it clamps to the FLOOR
+     rather than reaching the default — every link, old or new, came back with a 10-minute no-test
+     assessment instead of 44. */
+  S.assessNo  = lim("assessNo", at(17, S.assess), S.assess);
 }
 
 /* ⚠ BUILT ONCE, THEN ONLY THE READOUTS CHANGE. These sliders sit next to the chart they drive,
@@ -1369,15 +1410,18 @@ function drawBedList(){
 
 
   const ccPart = tot ? sel.filter(x=>BEDPICK.has(x.i)).reduce((a,x)=>a+x.s,0)/tot : 0;
-  const eff = liveBedShare();
+  const drawn = liveBedShare(), eff = bedShareDisplay(drawn, S.bedGrp);
+  // count only the ticked complaints the lane ACTUALLY takes — the share already excludes the
+  // others, so the sentence could read "3 complaints" while none of them was accepted
+  const bedTicked = CC.filter(x => BEDPICK.has(x.i) && PICK.has(x.i)).length;
   // the interpreter term, stated on its own so the three parts can be read against each other
   const intpPart = tot && S.bedIntp
     ? sel.filter(x=>!BEDPICK.has(x.i)).reduce((a,x)=>a + x.s*(x.x!=null?x.x:D.g.interp), 0)/tot : 0;
   $("bedSum").innerHTML = `<b class="num">${Math.round(100*eff)}%</b> of the patients this lane
     accepts must have a room &mdash; <b class="num">${Math.round(100*ccPart)}%</b> from the
-    ${BEDPICK.size} complaint${BEDPICK.size===1?"":"s"} ticked below${S.bedIntp
+    ${bedTicked} complaint${bedTicked===1?"":"s"} ticked on the list${S.bedIntp
       ? `, <b class="num">${Math.round(100*intpPart)}%</b> needing an interpreter` : ``}${S.bedGrp
-      ? `, <b class="num">${Math.round(100*(1-Math.min(1,ccPart+intpPart))*((D.grp&&D.grp.share)||0))}%</b> arriving with a sibling` : ``}, plus
+      ? `, <b class="num">${Math.round(100*(eff-drawn))}%</b> arriving with a sibling` : ``}, plus
     <b class="num">${S.bedExtra}%</b> of everyone else.
     ${S.bedExtra===0 ? `<span class="dim">Nothing is allowed yet for the reasons no complaint can
       carry &mdash; a sensitive history, a family who needs a door &mdash; so this is a floor.</span>` : ``}`;
@@ -1410,7 +1454,8 @@ function drawBedList(){
 
   /* ⚠ built once, like every other slider on this page — rebuilding it inside its own oninput
      replaces the element under the pointer and kills the drag after one step */
-  if(!$("bedx")){
+  if(!bedxBuilt){
+    bedxBuilt = true;
     $("bedExtraCtl").innerHTML = `<div class="ctl"><div class="ctl-top">
         <label for="bedx">Plus this share of everyone else</label>
         <output class="num" id="bedxOut"></output></div>

@@ -375,6 +375,95 @@ setTimeout(()=>{
     : "FAIL — the partition is free or better: " + sSplit.perArrival.toFixed(2)
       + " vs " + sPref.perArrival.toFixed(2));
 
+  /* ── the four defects the 2026-08-22 sweep found ──────────────────────────
+     Each of these shipped. None of the 38 checks above caught any of them. */
+
+  /* 1. LINK ROUND-TRIP, every mode, narrowed and not. hashState wrote optional fields and
+        fromHash read a fixed layout, so a plain split lane came back as "Breathing Difficulty
+        only" — 49.5 against a 50.0 bar. run() writes the hash on every recompute, so a refresh
+        did it too. Round-trip is the only check that would have caught it. */
+  let rtFail = "";
+  for(const m of ["split","pooled","bedfirst","stream"]){
+    for(const narrowed of [false, true]){
+      S.mode=m; S.A=6; S.R=4; S.cyc=76; S.assess=44; S.assessNo=51; S.fastDischarge=true;
+      S.start=15; S.len=8; S.level=2; S.bedExtra=7; S.bedIntp=true; S.bedGrp=false;
+      S.turnRoom=13; S.turnChair=2; S.roomsA=(m==="split");
+      PICK = narrowed ? new Set([0,1,2]) : new Set(CC.map(x=>x.i));
+      BEDPICK = new Set([2,9]);
+      const want = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+        fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
+        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair,
+        roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
+      location.hash = encodeURIComponent(hashState());
+      S.assessNo=0; S.turnRoom=0; S.turnChair=0; PICK=new Set(); BEDPICK=new Set();
+      fromHash();
+      const got = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+        fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
+        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair,
+        roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
+      for(const k of Object.keys(want))
+        if(String(want[k]) !== String(got[k]) && !rtFail)
+          rtFail = m + (narrowed?" narrowed":" full") + " " + k + ": " + want[k] + " -> " + got[k];
+    }
+  }
+  console.log("links round-trip, all 4 modes:", rtFail ? "FAIL — " + rtFail : "yes (8 lanes)");
+  location.hash = ""; PICK = new Set(CC.map(x=>x.i)); BEDPICK = new Set(BED_IDS);
+
+  /* 2. ROOMS FIRST means rooms first for EVERYONE. A chair-eligible patient must take a bed while
+        one is free — this read "only once every chair is full", inverting the mode. */
+  const firstPlace = (() => {
+    const tr = sim({A:6, R:4, pooled:false, bedFirst:true, bedShare:0, bedGrp:false, assessMin:44,
+      fastDischarge:false, turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res,
+      days:1, seeds:[11], trace:true}).trace;
+    return (tr.find(e => e.ev==="assess" || e.ev==="second") || {}).ev;
+  })();
+  console.log("bed-first fills rooms first:", firstPlace === "assess"
+    ? "yes (first patient of an empty lane takes a room)"
+    : "FAIL — first placement was a " + firstPlace);
+
+  /* 3. The share handed to the engine must NOT carry the sibling term, because the engine applies
+        it structurally from the party size. Panel said 22.8% while the engine realised 27.2%. */
+  const drawnNow = bedShareOf(PICK, new Set(BED_IDS), 0, true);
+  const shownNow = bedShareDisplay(drawnNow, true);
+  console.log("sibling share counted once :", shownNow > drawnNow
+      && Math.abs(shownNow - (1-(1-D.grp.share)*(1-drawnNow))) < 1e-9
+    ? "yes (engine " + (100*drawnNow).toFixed(1) + "%, realised "
+      + (100*shownNow).toFixed(1) + "%)"
+    : "FAIL — engine " + drawnNow + " shown " + shownNow);
+
+  /* 4. A party is seated together. Force every party to four in a lane of three: nothing can ever
+        fit, so nobody may be seen. Members arrive as separate events at one instant, and draining
+        on the first one seated it alone — 17% of pairs were still being split. */
+  const held = D.grp;
+  D.grp = {p2:0, p3:0, p4:1, mean_group_size:4, share:1};
+  const tooBig = sim({A:3, R:0, pooled:true, assessMin:44, fastDischarge:false, turnA:0, turnB:0,
+    lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:200, seeds:[11,12]});
+  D.grp = held;
+  console.log("a party is never split     :", tooBig.seen === 0
+    ? "yes (parties of 4 never fit a lane of 3, and none is seen)"
+    : "FAIL — " + tooBig.seen.toFixed(1) + " seen per evening in a lane no party fits");
+
+  /* 5. Now that the controls actually render (REAL_IDS), exercise them — the sliders exist to be
+        dragged, and an oninput that throws or fails to move state is invisible otherwise. */
+  S.mode="bedfirst"; S.fastDischarge=true; run();
+  const ctlFail = [];
+  const drag = (id, v, read) => { const el = document.getElementById(id);
+    if(!el){ ctlFail.push(id + " missing"); return }
+    el.value = String(v); el.oninput && el.oninput({target:el});
+    if(read() !== v) ctlFail.push(id + " -> " + read() + " (wanted " + v + ")"); };
+  drag("trn", 22, () => S.turnRoom);
+  drag("trc",  6, () => S.turnChair);
+  drag("asn", 58, () => S.assessNo);
+  const tap = id => { const el = document.getElementById(id);
+    if(!el){ ctlFail.push(id + " missing"); return } el.onclick && el.onclick(); };
+  const intpWas = S.bedIntp, grpWas = S.bedGrp;
+  tap("bedIntpBtn"); tap("bedGrpBtn");
+  if(S.bedIntp === intpWas) ctlFail.push("bedIntpBtn inert");
+  if(S.bedGrp  === grpWas)  ctlFail.push("bedGrpBtn inert");
+  console.log("today's controls actually run:", ctlFail.length ? "FAIL — " + ctlFail.join("; ")
+    : "yes (turnover x2, no-test assessment, interpreter, sibling)");
+  S.turnRoom=10; S.turnChair=1; S.assessNo=44; S.bedIntp=true; S.bedGrp=true;
+
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 
   console.log("\nsample markup:", A.slice(A.indexOf("<span class=\"slot full"), A.indexOf("<span class=\"slot full")+230).replace(/\s+/g," "));
