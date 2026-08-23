@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 89;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 92;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -830,6 +830,53 @@ setTimeout(()=>{ try{
     ? "yes (" + roomReq + " room-required patients over 120 days, none seated in a chair)"
     : "FAIL — " + chaired + " of " + roomReq + " room-required patients took a chair");
   S.bedGrp=true; S.bedExtra=0; S.mode="split"; S.A=6; S.R=4; run();
+
+  /* 10n. NOBODY IS LEFT IN THE LANE AT CLOSE, AND THE SCORE IS MONOTONE IN SPACES.
+          `qr` — assessed patients with no second-area space — used to keep waiting past CLOSE
+          with nothing to release them: a starved second area ran to 1,031 minutes, nine hours
+          after the lane shut, and the score went NON-MONOTONE in the primary slider (at R=1,
+          A=1->14 moved it 137 -> 286, because more spaces fed more patients into the same trap).
+          The department's answer (operator, 2026-08-23) is that they are moved to the main
+          department, so they are diverted and their space is freed. Two properties: the lane
+          empties, and adding a space can no longer make the lane worse. */
+  const tailEnd = [];
+  for(const [A2, R2] of [[6,1],[10,1],[14,1],[8,2]]){
+    S.mode="split"; S.A=A2; S.R=R2; run(); buildTrace();
+    const last = Math.max(...PLAY.trace.map(e => e.t));
+    const stillIn = stageState(S.len*60 + 600);
+    if(stillIn.A.some(Boolean) || stillIn.B.some(Boolean) || last > S.len*60 + 240)
+      tailEnd.push(A2+"+"+R2+" last event t=" + last.toFixed(0));
+  }
+  console.log("the lane empties at close   :", tailEnd.length === 0
+    ? "yes (4 starved layouts, nothing held more than 4h past close)"
+    : "FAIL — " + tailEnd.join("; "));
+  const mono = [];
+  for(const R2 of [1, 2, 4]){
+    let prev = Infinity, seq = [];
+    for(const A2 of [2, 4, 6, 8, 11, 14]){
+      const sc = evaluate({mode:"split", A:A2, R:R2, cyc:76, assess:44, assessNo:44,
+        fastDischarge:false, cc:CC.map(x=>x.i).join("."), start:15, len:8}, LEVELS[1].pts).score;
+      seq.push(sc);
+      if(sc > prev + 1.5) mono.push("R=" + R2 + " got worse at A=" + A2 + " (" + seq.map(v=>v.toFixed(0)).join(">") + ")");
+      prev = sc;
+    }
+  }
+  console.log("more spaces never score worse:", mono.length === 0
+    ? "yes (R=1, 2 and 4, across A=2..14)" : "FAIL — " + mono.join("; "));
+
+  /* 10m. THE PROCESS FLOOR REACHES THE WAIT. triage -> being put in a space is a median 13 min
+          here and the engine had no representation for it, which is most of why it predicted 8
+          minutes to be roomed where the department measures 22. */
+  /* ⚠ ISOLATE THE FLOOR. Comparing docs:1 against docs:0 changes three things at once — the
+     queue, the hold rescale AND the floor — and they partly cancel. Vary only floorRoom. */
+  const fBase = {A:11, R:0, pooled:true, assessMin:44, assessNo:44, fastDischarge:false,
+    turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:600, seeds:[11,12,13,14]};
+  const fOff = sim({...fBase, floorRoom:0}).perArrival;
+  const fOn  = sim({...fBase, floorRoom:D.floor_room}).perArrival;
+  console.log("the rooming process is charged:",
+    D.floor_room > 2 && Math.abs((fOn - fOff) - D.floor_room) < 0.5
+    ? "yes (+" + (fOn - fOff).toFixed(1) + " min, the " + D.floor_room + " min floor, undelayed)"
+    : "FAIL — floor " + D.floor_room + " but the wait moved " + (fOn - fOff).toFixed(2));
 
   /* 10o. THE PROVIDER QUEUE. Four properties: off is the old engine; it reproduces the queue the
           department measures; it is FIFO (roomed ahead of you means seen ahead of you, which is

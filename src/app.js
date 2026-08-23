@@ -45,7 +45,7 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
    moves every published comparison between the layouts. It needs an operator's answer first. */
 function sim(cfg){
   let qSum = 0, qN = 0, hSum = 0, hN = 0;   // provider-queue and space-hold accumulators
-  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
+  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace} = cfg;
   // `trace` records one evening, patient by patient, so the animation plays the SAME run the
@@ -144,7 +144,16 @@ function sim(cfg){
         const v = docs ? docQueue(t) + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) : raw;
         hSum += v; hN++;                 // exposed so the no-double-count property is testable
         return v; };
-      const rec = (tag,w,dv) => { const tt=w+floor; if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++;
+      /* ⚠ THE PROCESS FLOOR IS TWO PARTS. `floor` is arrival -> triage; `floorRoom` is triage ->
+         actually being put in a space, a median 13 min here that the engine had no
+         representation for at all — which is most of why it predicted 8 minutes to be roomed
+         where the department measures 22. It is process and not queueing: not one pod patient in
+         746 was seated with every chair full, so none of it is waiting for a chair. It is
+         anchored undelayed and scaled by the crowding multiplier because it demonstrably responds
+         to how full the department is (8 min at 0-9 patients present, 12 at 10-19, 18.5 at
+         20-29) — a different interval from the queue that multiplier already lengthens, so the
+         two do not overlap. */
+      const rec = (tag,w,dv) => { const tt=w+floor+floorRoom*(load ? load[hb(arr[tag])] : 1); if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++;
         if(bedReq){ const b=BY[bedReq[tag]]; b.wait+=tt; b.n++; if(dv) b.div++; else b.seen++ } };
 
       const startA = (t,tag) => { ab++;
@@ -292,7 +301,22 @@ function sim(cfg){
         if(kind===-1){ for(const q of qa){ divN++; divWait += CLOSE-q[0]+floor; divH[hb(arr[q[1]])]++;
                                            rec(q[1], CLOSE-q[0], true);
                                            if(T) T.push({t, id:q[1], ev:"divert"}) }
-                       qa.length=0; if(T) T.push({t, ev:"close"}); continue }
+                       qa.length=0;
+                       /* ⚠ AND THE PATIENTS STUCK MID-LANE GO TOO (operator, 2026-08-23). `qr`
+                          holds patients who have been assessed and are waiting for a second-area
+                          space. They used to keep waiting past CLOSE with nothing to release
+                          them, so a starved second area ran to 1,031 minutes — nine hours after
+                          the lane shut — and the score went NON-MONOTONE in the primary slider:
+                          at R=1, adding assessment spaces made it worse, 137 -> 286, because more
+                          spaces fed more patients into the same trap. The department's answer is
+                          that they are moved to the main department, so they are charged the same
+                          divert as anyone still in the waiting room, and their space is freed. */
+                       for(const q of qr){ divN++; divWait += CLOSE-q[0]+floor; divH[hb(arr[q[1]])]++;
+                                           rec(q[1], CLOSE-q[0], true);
+                                           if(T) T.push({t, id:q[1], ev:"divert"});
+                                           releaseA(t, q[1]) }
+                       qr.length=0;
+                       if(T) T.push({t, ev:"close"}); continue }
         if(bedFirst || stream){
           if(kind===0){ /* A family needs a door: siblings go in one room together rather than
                            into separate chairs across the lane, so arriving with a sibling is a
@@ -450,7 +474,16 @@ function stageState(t){
                                else { const w = where.get(e.id);
                                       if(w && (!e.pool || w[0] === e.pool)){ (w[0]==="A"?A:B)[w[1]] = null;
                                                                              where.delete(e.id) } } }
-    else if(e.ev === "divert"){ waiting--; sent++ }
+    else if(e.ev === "divert"){
+      /* ⚠ TWO KINDS OF DIVERT SINCE 2026-08-23. Someone still in the WAITING ROOM at close leaves
+         the waiting pool. Someone stuck MID-LANE — assessed, with no second-area space, now moved
+         to the main department — was taken out of `waiting` when they were seated, so decrementing
+         again drove it negative and `new Array(negative)` killed the stage outright. They vacate a
+         SPACE instead, which is what the eye should see. */
+      const w = where.get(e.id);
+      if(w){ (w[0]==="A"?A:B)[w[1]] = null; where.delete(e.id); stuck.delete(e.id) }
+      else waiting--;
+      sent++ }
   }
   return {A, B, waiting, gone, sent, stuck, test};
 }
@@ -751,7 +784,7 @@ function evaluate(cfg, dayTotal){
               assessMin`, so a cfg without the field worked; multiplying an undefined by the mix
               factor gives NaN, and a NaN reaches the board as a blank score. */
            assessNo: assessNoEff,
-           load, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
+           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
            asw:scale(D.asw, f*w("a")/D.g.asw), now:scale(D.now, f*w("o")/D.g.now),
            res:scale(D.res, f*w("r")/D.g.res), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
 
