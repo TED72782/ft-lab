@@ -311,8 +311,12 @@ function sim(cfg){
                           spaces fed more patients into the same trap. The department's answer is
                           that they are moved to the main department, so they are charged the same
                           divert as anyone still in the waiting room, and their space is freed. */
+                       /* ⚠ NO SECOND rec() FLOOR. These patients were already charged
+                          floor + floorRoom by rec() when they were SEATED, so charging it again
+                          double-counts the door-to-triage time for everyone diverted mid-lane —
+                          and puts two samples per patient into the by-hour chart. divWait keeps
+                          its own +floor because that term is the divert's own accounting. */
                        for(const q of qr){ divN++; divWait += CLOSE-q[0]+floor; divH[hb(arr[q[1]])]++;
-                                           rec(q[1], CLOSE-q[0], true);
                                            if(T) T.push({t, id:q[1], ev:"divert"});
                                            releaseA(t, q[1]) }
                        qr.length=0;
@@ -423,7 +427,19 @@ function buildTrace(){
      screen from the one the cards describe, which is worse than showing no lane at all. */
   const base = {A:S.A, R:m.hasR?S.R:0, pooled:m.id==="pooled", bedGrp:S.bedGrp, ...turnFor(S),
                 bedFirst:m.id==="bedfirst", stream:m.id==="stream", bedShare:liveBedShare(), assessMin:S.assess,
+                /* ⚠ EVERY SCORED PARAMETER, OR THE STAGE PLAYS A DIFFERENT LANE. `load` and
+                   `floorRoom` were added to evaluate() and not here, so the animation was
+                   bit-identical at every setting of a dial worth ~5 score points — a lane the
+                   score has jamming played as one emptying. The fingerprint guard could not see
+                   it: it identifies MODES, and these are numeric parameters. */
                 docs:S.docs, docMin:D.doc_min ?? 18, postShare:D.postdoc_share,
+                floorRoom: S.docs ? (D.floor_room ?? 0) : 0,
+                load: (D.occ24 && D.load_beta)
+                  ? Array.from({length:S.len}, (_,i) => Math.max(1, Math.min(2.2,
+                      Math.exp((S.loadPct/100) * D.load_beta *
+                        (D.occ24[(S.start+i) % 24] * (LEVELS[S.level].pts / D.day_mean)
+                         - (D.occ_floor ?? D.occ_ref))))))
+                  : null,
                 assessNo:S.assessNo * mx.fm,
                 fastDischarge:S.fastDischarge, shr:mx.shr, lam,
                 asw:scale(D.asw, f*mx.fa), now:scale(D.now, f*mx.fo), res:scale(D.res, f*mx.fr),
@@ -1513,6 +1529,14 @@ async function addEntry(){
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
                bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
+               /* ⚠ EVERY FIELD THE SCORE USES MUST BE WRITTEN HERE. These two were added to the
+                  ENGINE and to the link and not to the board, so sane() read them as absent —
+                  i.e. legacy — and every saved row was scored by the pre-provider-queue model.
+                  On a busy day that made the board say a pooled-10 lane SAVES 20.4 min where the
+                  page's own engine says it LOSES 3.2: the sign of the answer flipped, on the
+                  artefact physicians are sent. A comment three lines below claimed "new rows
+                  always carry the field"; nothing wrote it. */
+               loadPct:S.loadPct, docs:S.docs,
                /* ⚠ NO bedShare HERE, DELIBERATELY. A sweep flagged that the board scores on
                   `cfg.bedShare` while addEntry never wrote it. But evaluate() honours that field
                   ONLY when `cfg.bedcc === undefined` (line ~650), i.e. for rows saved before the
@@ -1987,6 +2011,8 @@ function run(){
                loadPct:S.loadPct, docs:S.docs, assessNo:S.assessNo,
                cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len, bar:S.bar};
   const E = evaluate(cfg, lvl.pts), o = E.o;
+  LAST_SCORE = E.score;   // what the hero card is about to show, exposed so a guard can compare
+                          // the SAVED row against it — the save path had no test at all
   drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
   $("speedCtl").querySelectorAll("[data-fd]").forEach(bt=>bt.onclick=()=>{
     S.fastDischarge = bt.dataset.fd==="1"; run() });
@@ -2158,7 +2184,7 @@ function run(){
    an open tab is how these actually get passed around.
    The guard is SELF_HASH: run() rewrites the address on every recompute, and reacting to our own
    write would reset the lane mid-edit. Only a hash we did not write is treated as an arrival. */
-var SELF_HASH = "";   // var, not let: run() assigns it before this line is reached
+var SELF_HASH = "", LAST_SCORE = null;   // var, not let: run() assigns it before this line is reached
 addEventListener("hashchange", () => {
   const h = location.hash.replace(/^#/, "");
   if(!h || h === SELF_HASH) return;

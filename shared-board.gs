@@ -24,7 +24,11 @@
 var SHEET = 'board';
 var HEAD = ['who', 'mode', 'A', 'R', 'cyc', 'assess', 'fastDischarge', 'at',
             'cc', 'start', 'len', 'bedcc', 'bedExtra', 'bedIntp',
-            'bedGrp', 'turnRoom', 'turnChair', 'roomsA', 'assessNo'];
+            'bedGrp', 'turnRoom', 'turnChair', 'roomsA', 'assessNo',
+            // ⚠ added 2026-08-23 WITH the engine change, not after it. These two are SCORED
+            // fields; a board that cannot carry them silently reads every row as legacy and
+            // scores it on the previous engine, which inverted the page's own conclusion.
+            'loadPct', 'docs'];
 
 function sheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -87,7 +91,9 @@ function read_() {
                      : (r[17] === true || r[17] === 'TRUE'),
              // undefined, not a number: the page falls it back to `assess`, which is what a row
              // saved before the two halves were split actually meant
-             assessNo: r[18] === '' || r[18] === undefined ? undefined : Number(r[18]) },
+             assessNo: r[18] === '' || r[18] === undefined ? undefined : Number(r[18]),
+             loadPct: r[19] === '' || r[19] === undefined ? undefined : Number(r[19]),
+             docs:    r[20] === '' || r[20] === undefined ? undefined : Number(r[20]) },
       at: Number(r[7]) || 0
     });
   }
@@ -133,7 +139,9 @@ function doPost(e) {
         Number(rows[i][15] || 0) === Number(c.turnRoom || 0) &&
         Number(rows[i][16] || 0) === Number(c.turnChair || 0) &&
         (rows[i][17] === true || rows[i][17] === 'TRUE') === (c.roomsA === true) &&
-        Number(rows[i][18] || 0) === Number(c.assessNo || 0)) {
+        Number(rows[i][18] || 0) === Number(c.assessNo || 0) &&
+        Number(rows[i][19] || 0) === Number(c.loadPct || 0) &&
+        Number(rows[i][20] || 0) === Number(c.docs || 0)) {
         sh.deleteRow(i + 1);
       }
     }
@@ -164,7 +172,9 @@ function doPost(e) {
                   c.turnRoom === undefined || c.turnRoom === null ? '' : Number(c.turnRoom),
                   c.turnChair === undefined || c.turnChair === null ? '' : Number(c.turnChair),
                   c.roomsA === true,
-                  c.assessNo === undefined || c.assessNo === null ? '' : Number(c.assessNo)]);
+                  c.assessNo === undefined || c.assessNo === null ? '' : Number(c.assessNo),
+                  c.loadPct === undefined || c.loadPct === null ? '' : Number(c.loadPct),
+                  c.docs === undefined || c.docs === null ? '' : Number(c.docs)]);
     return json_(read_());
   } catch (err) {
     return json_({ error: String(err) });

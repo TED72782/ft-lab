@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 92;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 95;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -831,6 +831,29 @@ setTimeout(()=>{ try{
     : "FAIL — " + chaired + " of " + roomReq + " room-required patients took a chair");
   S.bedGrp=true; S.bedExtra=0; S.mode="split"; S.A=6; S.R=4; run();
 
+  /* 10k. ⚠⚠ THE ROW THAT GETS SAVED MUST SCORE WHAT THE PAGE SHOWED. Every existing check
+          hand-builds BOTH cfgs and compares evaluate() to scoreOf() — which calls evaluate().
+          None of them calls addEntry(), so the real question, "does the save path write what the
+          score used", was untested. It was also wrong: two scored fields were added to the engine
+          and the link and not to addEntry, so sane() read them as absent, every saved row was
+          scored on the previous engine, and on a busy day the board said a lane SAVED 20 min
+          where the page said it LOST 3. The sign of the answer flipped, on the artefact
+          physicians are sent. Drive the real save path and score what it stored. */
+  SHARED = false; saveLocal([]);
+  S.mode="pooled"; S.A=10; S.R=0; S.loadPct=100; S.docs=1; S.level=2;
+  PICK = new Set(CC.map(x=>x.i)); BEDPICK = new Set(BED_IDS); run();
+  const shown = LAST_SCORE;
+  const whoEl = document.getElementById("who"); whoEl.value = "roundtrip";
+  addEntry();
+  const saved = board().find(r => r.who === "roundtrip");
+  const savedScore = saved ? scoreOf(sane(saved.cfg), LEVELS[S.level].pts).score : null;
+  console.log("a saved row scores what was shown:", saved && Math.abs(savedScore - shown) < 0.5
+    ? "yes (" + shown.toFixed(2) + " on the page, " + savedScore.toFixed(2) + " on the board)"
+    : "FAIL — page " + (shown==null?"?":shown.toFixed(2)) + " vs board "
+      + (savedScore==null ? "NOT SAVED" : savedScore.toFixed(2))
+      + "; stored cfg " + JSON.stringify(saved ? saved.cfg : null).slice(0,160));
+  saveLocal([]);
+
   /* 10n. NOBODY IS LEFT IN THE LANE AT CLOSE, AND THE SCORE IS MONOTONE IN SPACES.
           `qr` — assessed patients with no second-area space — used to keep waiting past CLOSE
           with nothing to release them: a starved second area ran to 1,031 minutes, nine hours
@@ -842,13 +865,19 @@ setTimeout(()=>{ try{
   const tailEnd = [];
   for(const [A2, R2] of [[6,1],[10,1],[14,1],[8,2]]){
     S.mode="split"; S.A=A2; S.R=R2; run(); buildTrace();
-    const last = Math.max(...PLAY.trace.map(e => e.t));
+    /* ⚠ THE INVARIANT IS "NOBODY IS STUCK", NOT "EVERYTHING ENDS BY A CLOCK TIME". A patient
+       roomed just before close legitimately finishes their care afterwards — bounding the last
+       event at close+4h failed on a perfectly correct 8+2 lane whose last patient departed at
+       765. What must not happen is a patient left WAITING TO MOVE with nothing to release them,
+       which is the trap the qr fix closed. */
     const stillIn = stageState(S.len*60 + 600);
-    if(stillIn.A.some(Boolean) || stillIn.B.some(Boolean) || last > S.len*60 + 240)
-      tailEnd.push(A2+"+"+R2+" last event t=" + last.toFixed(0));
+    const stuckAfter = [...stillIn.stuck];
+    if(stillIn.A.some(Boolean) || stillIn.B.some(Boolean) || stuckAfter.length)
+      tailEnd.push(A2+"+"+R2+" still holding " + stillIn.A.filter(Boolean).length + "+"
+        + stillIn.B.filter(Boolean).length + ", stuck " + stuckAfter.length);
   }
   console.log("the lane empties at close   :", tailEnd.length === 0
-    ? "yes (4 starved layouts, nothing held more than 4h past close)"
+    ? "yes (4 starved layouts, no space held and nobody stuck 10h past close)"
     : "FAIL — " + tailEnd.join("; "));
   const mono = [];
   for(const R2 of [1, 2, 4]){
@@ -1001,6 +1030,15 @@ setTimeout(()=>{ try{
      an EMPTY department makes this lane faster than its own baseline, and made the model claim
      that removing the crowding effect makes a quiet day WORSE by 3 minutes. Crowding can add
      delay; its absence is the floor, not a bonus. Every busier hour only ever adds. */
+  /* ⚠ ASSERT THE ANCHOR, NOT JUST THE FLOOR. `max(1, ...)` pins the low end at 1.000 whether the
+     multiplier is measured from the quietest hour or from the MEAN, so this check passed under
+     both — and losing `occ_floor` from data.json moves every published score by 10 minutes with
+     the whole harness green. Pin the peak to the value the anchor implies. */
+  const expectHi = Math.min(2.2, Math.exp(D.load_beta * (Math.max(...D.occ24) - Math.min(...D.occ24))));
+  console.log("the crowding anchor is the floor:", Math.abs(mHi - expectHi) < 0.02
+    ? "yes (peak x" + mHi.toFixed(2) + ", the span from the quietest hour)"
+    : "FAIL — peak x" + mHi.toFixed(3) + " but the quietest-hour anchor implies x"
+      + expectHi.toFixed(3) + " (anchored at the mean instead?)");
   console.log("crowding only ever delays    :", mLo >= 1 && mLo < 1.02 && mHi > 1.1
     ? "yes (x" + mLo.toFixed(2) + " at the quietest hour, x" + mHi.toFixed(2) + " at the busiest)"
     : "FAIL — multiplier spans " + mLo.toFixed(3) + " to " + mHi.toFixed(3));
@@ -1039,6 +1077,18 @@ setTimeout(()=>{ try{
   console.log("the stage plays the scored lane:", fpBad.length === 0
     ? "yes (all four layouts leave their own fingerprint in the trace)"
     : "FAIL — " + fpBad.join("; "));
+  /* ⚠ AND IT MUST RESPOND TO THE NUMERIC PARAMETERS TOO. The fingerprint above identifies MODES,
+     so a scored number missing from buildTrace slips straight past it — `load` and `floorRoom`
+     did, and the animation was bit-identical at every setting of a dial worth ~5 score points:
+     a lane the score has jamming, played as one emptying. */
+  const traceAt = pct => { S.mode="bedfirst"; S.A=6; S.R=4; S.level=3; S.docs=1; S.loadPct=pct;
+    run(); buildTrace();
+    return PLAY.trace.filter(e => e.ev === "divert").length + "/" + PLAY.trace.length; };
+  const trQuiet = traceAt(0), trBusy = traceAt(200);
+  S.loadPct = 100; S.level = 1; S.mode="split"; S.A=6; S.R=4; run();
+  console.log("the stage feels the dials    :", trQuiet !== trBusy
+    ? "yes (diverts/events " + trQuiet + " at 0% against " + trBusy + " at 200%)"
+    : "FAIL — the trace is identical at 0% and 200%: " + trQuiet);
   S.mode = "split"; S.A = 6; S.R = 4; run();
 
   /* 10s. THE STREAM BOARDS MUST BE LABELLED THE RIGHT WAY ROUND. `the two streams can diverge`

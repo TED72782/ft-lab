@@ -108,7 +108,8 @@ class Handler(SimpleHTTPRequestHandler):
                     "bedcc": c.get("bedcc"), "bedExtra": c.get("bedExtra"),
                     "bedIntp": c.get("bedIntp"), "bedGrp": c.get("bedGrp"),
                     "turnRoom": c.get("turnRoom"), "turnChair": c.get("turnChair"),
-                    "roomsA": c.get("roomsA"), "assessNo": c.get("assessNo")}
+                    "roomsA": c.get("roomsA"), "assessNo": c.get("assessNo"),
+                    "loadPct": c.get("loadPct"), "docs": c.get("docs")}
             here = lane(entry["cfg"])
             # ⚠ ONE WRITER AT A TIME. ThreadingHTTPServer runs handlers concurrently and this
             # read-modify-write was unguarded, so two physicians adding at the same moment left

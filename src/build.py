@@ -32,7 +32,16 @@ _blob = json.dumps(data)
 if "</script" in _blob.lower():
     raise SystemExit("data.json contains a closing script tag — it would truncate the page")
 app = (SRC/"app.js").read_text().replace("__DATA__", json.dumps(data), 1)
-(SRC.parent/"index.html").write_text((SRC/"head.html").read_text() + body + app)
+# ⚠ app.js CARRIES {{tokens}} TOO, AND THEY SHIPPED RAW. Substitution ran on body.html only, and
+# the assert above checks only body.html — so `{{docqm}}` and `{{docmin}}` in a control's hint text
+# went out as literal markup on the live page, justifying the largest term in the score with
+# broken text. Substitute everywhere, and assert on what is actually WRITTEN.
+for k, v in data.get("prose", {}).items():
+    app = app.replace("{{%s}}" % k, str(v))
+page = (SRC/"head.html").read_text() + body + app
+if "{{" in page:
+    raise SystemExit("unfilled token in the built page: " + page[page.index("{{"):page.index("{{")+40])
+(SRC.parent/"index.html").write_text(page)
 shim = (SRC/"shim_head.js").read_text() + app + (SRC/"shim_tail.js").read_text()
 shim = shim.replace("<script>", "").replace("</script>", "")
 (SRC/"shim.js").write_text(shim)
