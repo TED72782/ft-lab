@@ -1564,13 +1564,15 @@ function drawCriteria(){
     Tap a complaint to take it or leave it${BEDMODE.has(S.mode)
       ? `, and <b>room</b> to say it needs one rather than a chair` : ``}.
     <span class="dim">&ldquo;Doctor to decision&rdquo; is how long from the doctor arriving to the
-    call being made, measured on every patient with that complaint &mdash;
-    ${Math.round(D.g.ddall)} min on average, ${Math.round(Math.min(...CC.map(x=>x.ddall)))} to
-    ${Math.round(Math.max(...CC.map(x=>x.ddall)))} across these. The long ones are the complaints
-    where something is DONE &mdash; a repair, a wound, a treatment and a re-check &mdash; or where
-    a result is being waited on. <b>It is not the moment they can move</b>: a patient can go
-    somewhere else once the assessment itself is finished, which happens inside this interval and
-    is recorded nowhere.</span>`;
+    call being made, <b>for the patients who needed no test</b> &mdash; ${Math.round(D.g.dd)} min on
+    average, ${Math.round(Math.min(...CC.filter(x=>!x.me).map(x=>x.dd)))} to
+    ${Math.round(Math.max(...CC.filter(x=>!x.me).map(x=>x.dd)))} across the complaints where enough
+    of them skipped one. The long ones are where something is DONE &mdash; a repair, a wound, a
+    treatment and a re-check. <b>It is not the moment they can move</b>: a patient can go somewhere
+    else once the assessment itself is finished, which happens inside this interval and is recorded
+    nowhere. The test rate beside it is measured on everyone, so the two describe different
+    patients on purpose &mdash; how often a test is needed, and how long it takes when one is
+    not.</span>`;
   /* ⚠ ONE LIST, TWO DECISIONS. There were two complaint panels — take-or-leave, and
      needs-a-bed — over the same 26 rows, so in a bed layout you tapped the same complaint in two
      places to say two different things, and the two lists could silently disagree (the exclusion
@@ -1584,17 +1586,19 @@ function drawCriteria(){
      sorting differently are still comparing the same lane. It is deliberately NOT in the link
      either — a view preference is not part of a lane.
 
-     ⚠ Both orderings run on ALL patients. `dd` is the doctor's time over the patients who needed
-     no test, which is what the ENGINE needs (the assessment time it scales applies to that half
-     alone) — but the row shows a test rate measured on everyone, so ranking by a
-     minority-subgroup figure compared two populations and reordered the list: on the no-test half
-     Fever reads 35 against Laceration's 71, and on all patients they are 70 and 76. A physician
-     concluding Fever was the twice-quicker chair patient would have had it backwards. Nothing
-     sinks in either ordering — every complaint has ample all-patient sample. */
+     ⚠ SORT ON WHAT THE ROW SHOWS. This sorted on `ddall` (every patient) while the row displayed
+     `dd` (no-test only), so "fastest first" produced an order the visible column contradicted.
+     Both are `dd` now, and `dd` is the right one to rank chair candidates on: 44-68% of `ddall`
+     elapses before the first RESULT lands — 66-68% for finger, ankle, arm and musculoskeletal —
+     so ranking on it puts the extremity complaints at the slow end and invites excluding exactly
+     the patients a chair suits. `dd` is a minority of each complaint, which is why the row names
+     its population; the fix for two populations side by side is to label them, not to swap in a
+     number that measures waiting for radiology. Rows with too few no-test patients fall back to
+     the lane figure and show a dash. */
   const order = S.ccSort === "fast"
-      ? CC.slice().sort((p, q) => p.ddall - q.ddall)
+      ? CC.slice().sort((p, q) => p.dd - q.dd)
     : S.ccSort === "test"
-      ? CC.slice().sort((p, q) => p.w - q.w || p.ddall - q.ddall)
+      ? CC.slice().sort((p, q) => p.w - q.w || p.dd - q.dd)
     : CC;
   $("ccList").innerHTML = order.map(x=>{
     const on = PICK.has(x.i), bed = BEDPICK.has(x.i);
@@ -1603,7 +1607,7 @@ function drawCriteria(){
         <span class="cc-n">${x.n}</span>
         <span class="cc-m"><b class="num">${(pts*x.s).toFixed(1)}</b> arrive while you are open
           · <span class="num">${Math.round(100*x.w)}%</span> need a test
-          · doctor to decision <span class="num">${x.me ? "&mdash;" : Math.round(x.dd)}</span>${
+          · doctor to decision, no test <span class="num">${x.me ? "&mdash;" : Math.round(x.dd)}</span>${
             x.me ? `<span class="dim"> (too few without a test)</span>` : ` min`}</span></button>${
       bedMode ? `<button type="button" class="cc-bed" data-bed="${x.i}" aria-pressed="${bed}"
           title="${bed ? "needs a room — tap to allow a chair" : "can use a chair — tap to require a room"}"

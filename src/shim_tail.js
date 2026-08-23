@@ -535,14 +535,20 @@ setTimeout(()=>{
       ? "yes (same 26 complaints, different order, identical score)"
       : "FAIL — set " + sameSet + ", reordered " + (idsByVol.join() !== idsByFast.join())
         + ", score " + scoreVol.toFixed(2) + " vs " + scoreFast.toFixed(2));
-  /* ⚠ the row shows ddall (every patient), not dd (the no-test half) — the two orderings differ
-     substantially and the row's test rate is over everyone, so a minority-subgroup doctor time
-     beside it was comparing two populations. */
-  const ddSeq = idsByFast.map(i => CC.find(x=>x.i===Number(i)).ddall);
-  console.log("fast order uses all patients:",
+  /* ⚠ THE ORDER MUST MATCH THE VISIBLE COLUMN. This once sorted on `ddall` while the row printed
+     `dd`, so "fastest first" gave an order the column contradicted. It ranks on `dd` — 44-68% of
+     `ddall` is time before the first RESULT lands, worst on the extremity complaints, so ranking
+     on it puts the best chair candidates at the slow end. */
+  const ddSeq = idsByFast.map(i => CC.find(x=>x.i===Number(i)).dd);
+  // the PRINTED numbers, not just the underlying field — that gap is what the bug was.
+  const shown = [...document.getElementById("ccList").innerHTML
+      .matchAll(/doctor to decision, no test <span class="num">([^<]+)</g)]
+      .map(m => m[1]).filter(v => /^\d+$/.test(v)).map(Number);
+  console.log("fast order matches the column:",
     ddSeq.every((v,k) => k===0 || ddSeq[k-1] <= v + 1e-9)
-      ? "yes (" + ddSeq[0].toFixed(0) + " to " + ddSeq[ddSeq.length-1].toFixed(0) + " min)"
-      : "FAIL — not ascending on ddall");
+    && shown.length > 10 && shown.every((v,k) => k===0 || shown[k-1] <= v)
+      ? "yes (" + shown[0] + " to " + shown[shown.length-1] + " min printed, no-test)"
+      : "FAIL — order and column disagree (" + shown.join(",") + ")");
   /* the third ordering: fewest tests first. `w` is measured on EVERY arrival, unlike `dd`, so
      nothing sinks here — and a check that it does not, because sinking would hide exactly the
      test-heavy complaints this ordering exists to surface. */
