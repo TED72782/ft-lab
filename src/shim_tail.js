@@ -781,5 +781,17 @@ setTimeout(()=>{
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 
-  console.log("\nsample markup:", A.slice(A.indexOf("<span class=\"slot full"), A.indexOf("<span class=\"slot full")+230).replace(/\s+/g," "));
+  /* ⚠ read the stage HERE. This used a `const A` captured 700 lines earlier at one arbitrary
+     minute, so it printed ">" whenever that minute had no full slot (indexOf -1 => slice(-1)),
+     and it broke outright when that capture moved. Find a minute that HAS one. */
+  S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; S.level=1;
+  PICK=new Set(CC.map(x=>x.i)); run(); buildTrace();   // a known lane, not whatever ran last
+  let sample = "";
+  for(let t=0; t<=S.len*60 && !sample; t++){
+    PLAY.t=t; drawStage();
+    const a = document.getElementById("stageA").innerHTML;
+    const i = a.indexOf('<span class="slot full');
+    if(i >= 0) sample = a.slice(i, i+230).replace(/\s+/g," ");
+  }
+  console.log("\nsample markup:", sample || "(no full slot in the whole run — check drawStage)");
 },60);
