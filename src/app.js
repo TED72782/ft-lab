@@ -180,7 +180,7 @@ function sim(cfg){
 
          So the two pools are not a sequence, they are a preference with an eligibility rule,
          and that is the whole of the difference. Set the bed-required share to zero and this
-         collapses exactly onto the pooled lane with A+R spaces — which is the right sanity
+         collapses onto the pooled lane with A+R spaces — which is the right sanity
          check, and also the honest statement of what the constraint costs. */
       const draw = tag => { const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
@@ -204,7 +204,7 @@ function sim(cfg){
 
          ⚠ Splitting a fixed estate into two pools that cannot help each other costs something, and
          this page already carries that in a guarded form: bed-first at 0% bed-required is
-         bit-identical to a pooled lane over the same spaces. Expect stream to score worse than
+         statistically identical to a pooled lane over the same spaces (it cannot be exactly identical: the bed-required roll consumes an RNG draw the pooled path does not, so the two run different realisations of the same seed — measured -0.12/-0.03/+0.07 at 200/1000/5000 days, non-shrinking and sign-flipping, i.e. noise around a true 0). Expect stream to score worse than
          bed-first at the same footprint. That IS the measurement — a department may stream because
          of how nursing is assigned, and this prices it. */
       /* ⚠ ROOMS FIRST FOR EVERYONE in bed-first — that is what the layout IS. It once read
@@ -1186,11 +1186,16 @@ let SHARED = false, cache = [], API = null;
    is stored, survived reload: the page stayed dead until site data was cleared by hand. */
 const localBoard = () => { try{
     const b = JSON.parse(localStorage.getItem(LB_KEY) || "[]");
-    return Array.isArray(b) ? b.filter(r => r && typeof r === "object" && r.cfg
-                                            && typeof r.cfg === "object") : [];
+    return wellFormed(b);
   }catch(e){ return [] } };
 const saveLocal  = b => { try{ localStorage.setItem(LB_KEY, JSON.stringify(b.slice(-40))) }catch(e){} };
-const board      = () => SHARED ? cache : localBoard();
+/* ⚠ THE SHAPE FILTER GUARDS BOTH STORES. It was added to localBoard() only, leaving the SHARED
+   path — the more exposed one, since one bad row reaches every reader and drawBoard runs inside
+   run() — taking whatever `cache` held. Neither shipped backend can produce a malformed row, but
+   a hand-edited board.json or any third-party Apps Script accepted by the ?board= regex can. */
+const wellFormed = b => Array.isArray(b)
+  ? b.filter(r => r && typeof r === "object" && r.cfg && typeof r.cfg === "object") : [];
+const board      = () => wellFormed(SHARED ? cache : localBoard());
 
 // The endpoint can arrive three ways, in this order: a ?board= link (so only ONE person ever
 // sets it up and everyone else just follows their link), whatever was saved here before, or a
@@ -1294,7 +1299,15 @@ function sane(cfg){
           /* A row saved before bed-first existed has neither, and was not that layout anyway.
              `bedcc` undefined means "Blake's list as the data can see it", which is what
              evaluate() assumes for it too — the same contract cc has. */
-          bedcc: cfg.bedcc, bedExtra: lim("bedExtra", cfg.bedExtra, 0),
+          /* ⚠ null IS ABSENT HERE TOO. The lim() fix closed this for every NUMERIC field, but cc
+             and bedcc are strings and never go through lim() — and they carry the same
+             `undefined` = "the default" contract. serve_board.py writes an explicit JSON null for
+             any key the posting page omitted while Apps Script omits it, so the same legacy row
+             read `null`, and String(null).split(".") is ["null"] -> [NaN] -> a criteria set that
+             matches NO complaint. The row then scores as a lane that takes nobody: 49.96, the
+             do-nothing baseline, against a true 27.53. bedcc is worse because it is silent —
+             29.38 against 29.87, and the load button hands back an empty room list. */
+          bedcc: cfg.bedcc ?? undefined, bedExtra: lim("bedExtra", cfg.bedExtra, 0),
           /* A row saved before the interpreter criterion existed was scored without it, so it
              must keep being scored without it — defaulting to true would silently re-rank other
              people's lanes under a rule they never chose. New rows always carry the field. */
@@ -1309,7 +1322,7 @@ function sane(cfg){
           turnRoom: lim("turnRoom", cfg.turnRoom, 0), turnChair: lim("turnChair", cfg.turnChair, 0),
           bedShare: cfg.bedcc === undefined ? cfg.bedShare : undefined,
           // entries saved before the window was adjustable ran the original 15:00-23:00 lane
-          start:lim("start",cfg.start,15), len:lim("len",cfg.len,8), cc:cfg.cc};
+          start:lim("start",cfg.start,15), len:lim("len",cfg.len,8), cc:cfg.cc ?? undefined};
 }
 /* ⚠ A ROW IS ONLY RE-SCORED WHEN ITS ANSWER CAN HAVE CHANGED. Each call simulates 600 days x 4 seeds
    (~13 ms), and drawBoard() re-runs EVERY row — a board that has collected a hundred lanes over

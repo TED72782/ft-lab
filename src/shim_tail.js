@@ -690,6 +690,28 @@ setTimeout(()=>{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10v. AN OMITTED FIELD AND AN EXPLICIT null MUST SCORE THE SAME. The two backends disagree by
+          construction — serve_board.py writes an explicit JSON null for any key the posting page
+          omitted, Apps Script omits it — so every optional field has to treat the two identically
+          or the SAME ROW scores differently depending on which board you are on. That was true of
+          the numeric fields (fixed via lim()) and was still true of the two STRING fields, where
+          String(null).split(".") is ["null"] -> [NaN] -> a criteria set matching no complaint, so
+          the row scored 49.96, the do-nothing baseline, instead of 27.53. Covers both. */
+  const OPTIONAL = ["cc","bedcc","cyc","assess","assessNo","bedExtra","bedIntp","bedGrp",
+                    "turnRoom","turnChair","roomsA","start","len","fastDischarge"];
+  const baseCfg = {mode:"bedfirst", A:6, R:4};
+  const nulled = [];
+  for(const f of OPTIONAL){
+    const omitted = {...baseCfg};
+    const explicit = {...baseCfg, [f]: null};
+    const a = scoreOf(omitted, LEVELS[1].pts).score;
+    const b = scoreOf(explicit, LEVELS[1].pts).score;
+    if(Math.abs(a-b) > 1e-9) nulled.push(f+": omitted "+a.toFixed(2)+" vs null "+b.toFixed(2));
+  }
+  console.log("null scores as absent       :", nulled.length === 0
+    ? "yes (" + OPTIONAL.length + " optional fields, both backends' conventions)"
+    : "FAIL — " + nulled.join("; "));
+
   /* 10x. FUZZ THE LINK, DO NOT SPOT-CHECK IT. The malformed-link guard used five fixed strings
           and none touched field 7 (`level`), which is the ONE numeric field that does not go
           through lim() — so a fractional level clamped into range and stayed fractional,
