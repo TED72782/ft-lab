@@ -121,6 +121,11 @@ function sim(cfg){
          engine is exactly as it was. */
       const releaseA = (t,tag) => ev.push([t+turnA,3,tag]);
       const releaseB = (t,tag) => ev.push([t+turnB,4,tag]);
+      /* ⚠ the ANIMATION has to see the release too. It used to free the slot on "leave", so a
+         space the engine was still holding for turnover showed as empty next to a queue — the
+         page claims a space that looks full IS full, and for 296 of 481 minutes on a tight lane
+         it was not. "free" is when the space is usable again; between the two it is being
+         turned over, and the stage now draws that. */
       /* A family is seated as one party or not at all — operator, 2026-08-22: they walk out
          together. Splitting one sibling into a chair and leaving the other outside with the parent
          is not a thing the department does, and modelling it that way would let a lane look like
@@ -220,8 +225,8 @@ function sim(cfg){
                  if(T) T.push({t, id:tag, ev:"leave"});
                  if(kind===1) releaseA(t,tag); else releaseB(t,tag) }
           else { // the space is turned over and usable again
-                 if(kind===3){ ab--; if(T) freeA.push(slotA[tag]) }
-                 else        { rb--; if(T) freeB.push(slotB[tag]) }
+                 if(kind===3){ ab--; if(T){ freeA.push(slotA[tag]); T.push({t, id:tag, ev:"free"}) } }
+                 else        { rb--; if(T){ freeB.push(slotB[tag]); T.push({t, id:tag, ev:"free"}) } }
                  drain(t) }
           if(ab+rb > peak) peak = ab+rb;
           continue;
@@ -243,10 +248,10 @@ function sim(cfg){
           if(T) T.push({t, id:tag, ev:"leave"});
           releaseB(t,tag);
         } else if(kind===3){                                        // assessment space turned over
-          ab--; if(T) freeA.push(slotA[tag]);
+          ab--; if(T){ freeA.push(slotA[tag]); T.push({t, id:tag, ev:"free"}) }
           takeNext(t);
         } else {                                                    // second-area space turned over
-          rb--; if(T) freeB.push(slotB[tag]);
+          rb--; if(T){ freeB.push(slotB[tag]); T.push({t, id:tag, ev:"free"}) }
           if(qr.length){ const q=qr.shift(); wr += t-q[0]; wrN++;
                          startB(t,q[1]); releaseA(t,q[1]) }
           else takeNext(t);
@@ -328,8 +333,13 @@ function stageState(t){
                                 B[e.slot] = e.id; where.set(e.id, ["B", e.slot]); stuck.delete(e.id) }
     else if(e.ev === "stuck"){ stuck.add(e.id) }
     else if(e.ev === "leave"){ const w = where.get(e.id);
+                               /* the patient is gone but the SPACE is not free yet — it is being
+                                  turned over, and the engine is still counting it occupied */
+                               if(w) (w[0]==="A"?A:B)[w[1]] = "turn";
+                               gone++ }
+    else if(e.ev === "free"){  const w = where.get(e.id);
                                if(w) (w[0]==="A"?A:B)[w[1]] = null;
-                               where.delete(e.id); gone++ }
+                               where.delete(e.id) }
     else if(e.ev === "divert"){ waiting--; sent++ }
   }
   return {A, B, waiting, gone, sent, stuck, test};
@@ -351,11 +361,16 @@ function person(cls, test){
    from opacity:0 sixty times a second — the boxes changed colour and the people were invisible
    until you paused. Keep the key in sync with anything `dot` renders. */
 function slotKey(id, st){
-  return id === null ? "-" : (st.stuck.has(id) ? "j" : "i") + (st.test.get(id) ? "t" : "n") + id;
+  if(id === null) return "-";
+  if(id === "turn") return "x";        // occupied by nobody, and not available either
+  return (st.stuck.has(id) ? "j" : "i") + (st.test.get(id) ? "t" : "n") + id;
 }
 function dot(id, st){
   const k = slotKey(id, st);
   if(id === null) return `<span class="slot" data-k="-"></span>`;
+  /* being turned over: the patient has gone, the space is not usable yet, and the engine is
+     still counting it occupied. Drawn as neither empty nor full, because it is neither. */
+  if(id === "turn") return `<span class="slot turn" data-k="x" title="being turned over"></span>`;
   const jam = st.stuck.has(id);
   return `<span class="slot full${jam?" jam":""}" data-k="${k}">${person(jam?"jam":"in", st.test.get(id))}</span>`;
 }
@@ -1166,7 +1181,12 @@ function sane(cfg){
    row, the day and the bar are inputs, so the result keys on exactly those. */
 const scoreCache = new Map();
 function scoreOf(cfg, pts){
-  const c = {...sane(cfg), bar: S.bar, days:300, seeds:[11,12,13]};
+  /* ⚠ THE SAME EVENINGS THE PAGE USES. This ran 300x3 while run() ran 600x4, so one lane had two
+     numbers — 29.50 on the hero card and 29.11 on the board — and since the layouts under
+     discussion sit within a minute of each other, the board could rank two lanes in the opposite
+     order to the page that produced them. A leaderboard whose order disagrees with the page is
+     worse than a slow one. Cached per distinct lane, so a board of N rows costs N scorings once. */
+  const c = {...sane(cfg), bar: S.bar, days:600, seeds:[11,12,13,14]};
   const ck = pts + "|" + S.bar + "|" + JSON.stringify(c);
   if(scoreCache.has(ck)) return scoreCache.get(ck);
   const E = evaluate(c, pts);

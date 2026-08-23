@@ -464,6 +464,36 @@ setTimeout(()=>{
     : "yes (turnover x2, no-test assessment, interpreter, sibling)");
   S.turnRoom=10; S.turnChair=1; S.assessNo=44; S.bedIntp=true; S.bedGrp=true;
 
+  /* 6. THE BOARD AND THE PAGE MUST AGREE ON A LANE. scoreOf ran 300x3 against run()'s 600x4, so
+        the same lane read 29.50 on the hero card and 29.11 on the board — and the layouts under
+        discussion sit within a minute of each other. */
+  S.mode="pooled"; S.A=10; S.R=0; S.cyc=76; S.assess=44; S.assessNo=44; S.fastDischarge=false;
+  S.start=15; S.len=8; S.level=2; S.turnRoom=10; S.turnChair=1; S.roomsA=false;
+  PICK = new Set(CC.map(x=>x.i)); run();
+  const heroScore = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+      fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start,
+      len:S.len, bar:S.bar, turnRoom:S.turnRoom, turnChair:S.turnChair}, LEVELS[S.level].pts).score;
+  const t0 = Date.now();
+  const boardScore = scoreOf({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+      fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start,
+      len:S.len, turnRoom:S.turnRoom, turnChair:S.turnChair}, LEVELS[S.level].pts).score;
+  const ms = Date.now() - t0;
+  console.log("board scores what the page does:", Math.abs(heroScore - boardScore) < 1e-9
+    ? "yes (" + heroScore.toFixed(2) + " both, " + ms + "ms a row)"
+    : "FAIL — page " + heroScore.toFixed(2) + " vs board " + boardScore.toFixed(2));
+
+  /* 7. A space being turned over is neither empty nor occupied on the stage. It used to go empty
+        the moment the patient left, while the engine still counted it full — the page tells a
+        physician that a space which looks full IS full. */
+  S.mode="bedfirst"; S.A=3; S.R=2; S.turnRoom=30; S.turnChair=15; run(); buildTrace();
+  const turnSeen = PLAY.trace.some(e => e.ev === "free")
+    && (() => { for(let t=0;t<480;t+=5){ const st=stageState(t);
+                  if(st.A.includes("turn") || st.B.includes("turn")) return true } return false })();
+  console.log("the stage shows turnover    :", turnSeen
+    ? "yes (a space reads as being turned over, not as free)"
+    : "FAIL — no slot ever shows the turnover state");
+  S.turnRoom=10; S.turnChair=1;
+
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 
   console.log("\nsample markup:", A.slice(A.indexOf("<span class=\"slot full"), A.indexOf("<span class=\"slot full")+230).replace(/\s+/g," "));
