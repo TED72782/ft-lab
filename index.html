@@ -1870,7 +1870,7 @@ function drawTurn(){
          <label for="trc">Turning over a chair</label><output class="num" id="trcOut"></output></div>
        <input type="range" id="trc" min="0" max="15" step="1" value="${S.turnChair}"></div>
        <div class="ctl"><div class="ctl-top">
-         <label for="ldk">How much a busy department slows everything</label>
+         <label for="ldk">How much a busy department ties up the provider</label>
          <output class="num" id="ldkOut"></output></div>
        <input type="range" id="ldk" min="0" max="200" step="10" value="${S.loadPct}"></div>
        <div class="ctl"><div class="ctl-top">
@@ -1884,13 +1884,15 @@ function drawTurn(){
          <i>ahead</i> of you; how full the lane is predicts nothing. Each provider is modelled at
          <b>{{docmin}} minutes</b> a patient, worked back from that queue rather than assumed.
          <b>0 removes the queue</b> and scores spaces alone, as this page did before.</div>
-       <div class="hint">Holds are measurably longer when the department is full &mdash; about
-         <b>2.7% per extra patient</b> in the building, which is half again as long at a busy hour
-         as at a quiet one. It is the <b>department's</b> load, not this lane's: put both in the
-         same comparison and only the department's survives, so a fuller lane does not slow itself
-         down. <b>100% is the effect as measured; 0 turns it off.</b> Whether crowding
-         <i>causes</i> the stretch is not established &mdash; a slow shift produces both &mdash;
-         which is why it is a dial.</div>`;
+       <div class="hint">When the rest of the department is full, the provider is <b>less
+         available to this lane</b> &mdash; and that, not slower care, is what crowding does here.
+         Split the wait apart and the whole effect sits in the time to be <i>seen</i> (+15% per
+         extra patient in the building); the time from the doctor arriving to the patient leaving
+         moves <b>+0.5%, which is nothing</b>. So this dial lengthens the provider's own minutes,
+         by about <b>3.4% per extra patient</b>, and leaves care alone. <b>It does nothing with no
+         provider set below.</b> 100% is the effect as measured; 0 turns it off. Whether crowding
+         <i>causes</i> it is not established &mdash; a slow shift produces both &mdash; which is
+         why it is a dial.</div>`;
     $("trn").oninput = e => { S.turnRoom  = +e.target.value; syncTurn(); requestRun() };
     $("trc").oninput = e => { S.turnChair = +e.target.value; syncTurn(); requestRun() };
     $("ldk").oninput = e => { S.loadPct   = +e.target.value; syncTurn(); requestRun() };
