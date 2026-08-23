@@ -787,7 +787,7 @@ const LEVELS = [
 // as acceptable is a judgement for the room, not a line in a chart.
 const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
            fastDischarge:false, level:1, bar:"today", start:15, len:8, bedExtra:0, bedIntp:true,
-           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false,
+           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, ccSort:"vol",
            /* ⚠ AN ASSUMPTION, AND IT HAS TO BE. It was briefly set to 67 — roomed -> DECISION —
               on the reading that a no-test patient can only leave the assessment space once the
               call is made. Operator, 2026-08-22: they can move as soon as the ASSESSMENT is done,
@@ -1527,7 +1527,17 @@ function drawCriteria(){
      layouts that HAVE beds. PICK and BEDPICK are untouched underneath, so the link, the board
      schema and every guard are unchanged — this is a rendering change, not a data one. */
   const bedMode = BEDMODE.has(S.mode);
-  $("ccList").innerHTML = CC.map(x=>{
+  /* ⚠ ORDER ONLY. Sorting is a way of LOOKING at the list, so it touches nothing that identifies a
+     complaint: the ids, PICK, BEDPICK, the link and the board are all untouched, and two people
+     sorting differently are still comparing the same lane. It is deliberately NOT in the link
+     either — a view preference is not part of a lane.
+     Estimated entries go LAST when sorting by speed, whatever their number: their figure is the
+     lane-wide fallback rather than a measurement, and ranking them among measured ones would
+     invite exactly the comparison the dash exists to prevent. */
+  const order = S.ccSort === "fast"
+    ? CC.slice().sort((p, q) => (p.me ? 1 : 0) - (q.me ? 1 : 0) || p.dd - q.dd)
+    : CC;
+  $("ccList").innerHTML = order.map(x=>{
     const on = PICK.has(x.i), bed = BEDPICK.has(x.i);
     return `<div class="cc-row${on?" on":""}${bed&&bedMode?" bed":""}">
       <button type="button" class="cc" data-cc="${x.i}" aria-pressed="${on}">
@@ -1540,6 +1550,11 @@ function drawCriteria(){
           title="${bed ? "needs a bed — tap for a chair" : "can use a chair — tap for a bed"}"
           ${on ? `` : `disabled`}>bed</button>` : ``}</div>`;
   }).join("");
+  const sortSeg = $("ccSortSeg");
+  if(sortSeg) sortSeg.querySelectorAll("[data-sort]").forEach(b=>{
+    b.setAttribute("aria-pressed", S.ccSort === b.dataset.sort);
+    b.onclick = () => { S.ccSort = b.dataset.sort; run() };
+  });
   $("ccList").querySelectorAll("[data-cc]").forEach(btn=>btn.onclick=()=>{
     const i=+btn.dataset.cc; PICK.has(i)?PICK.delete(i):PICK.add(i); run();
   });
@@ -1719,7 +1734,7 @@ function run(){
      so it has to redraw when the layout changes (chips appear) and when a chip is tapped — it was
      keyed on the criteria alone, and switching to a bed layout left a list with no chips at all. */
   const critKey = `${S.start}|${S.len}|${S.level}|${[...PICK].sort((x,y)=>x-y).join(".")}`
-    + `|${S.mode}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}`;
+    + `|${S.mode}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.ccSort}`;
   if(critKey !== lastCritKey){ lastCritKey = critKey; drawCriteria() }
   const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}`;
   if(bedKey !== lastBedKey){ lastBedKey = bedKey; drawBedList() }

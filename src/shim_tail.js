@@ -515,6 +515,34 @@ setTimeout(()=>{
     ? "yes (" + (100*bed.share).toFixed(0) + "% routed to beds, as set)"
     : "FAIL — " + (100*bed.share).toFixed(1) + "% routed to beds against a 50% rule");
 
+  /* 9. SORTING IS A VIEW, NOT A CHANGE. The list can be ordered by doctor-to-decision, and the
+        one thing that must never happen is a complaint changing identity underneath it — the
+        buttons carry ids, and a sort that renumbered them would silently re-point every tick. */
+  S.mode="split"; PICK = new Set(CC.map(x=>x.i)); S.ccSort="vol"; run();
+  const idsByVol  = [...document.getElementById("ccList").innerHTML.matchAll(/data-cc="(\d+)"/g)].map(m=>m[1]);
+  const scoreVol  = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+      fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
+      start:S.start, len:S.len, bar:S.bar}, LEVELS[S.level].pts).score;
+  S.ccSort="fast"; run();
+  const idsByFast = [...document.getElementById("ccList").innerHTML.matchAll(/data-cc="(\d+)"/g)].map(m=>m[1]);
+  const scoreFast = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+      fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
+      start:S.start, len:S.len, bar:S.bar}, LEVELS[S.level].pts).score;
+  const sameSet = idsByVol.length === idsByFast.length
+    && idsByVol.slice().sort().join() === idsByFast.slice().sort().join();
+  console.log("sorting reorders, nothing else:",
+    sameSet && idsByVol.join() !== idsByFast.join() && scoreVol === scoreFast
+      ? "yes (same 26 complaints, different order, identical score)"
+      : "FAIL — set " + sameSet + ", reordered " + (idsByVol.join() !== idsByFast.join())
+        + ", score " + scoreVol.toFixed(2) + " vs " + scoreFast.toFixed(2));
+  /* and the estimates sink, because their figure is a fallback rather than a measurement */
+  const tailIds = idsByFast.slice(-4).map(Number);
+  console.log("estimates sink to the bottom:",
+    tailIds.every(i => CC.find(x=>x.i===i).me)
+      ? "yes (the four dashed complaints are last)"
+      : "FAIL — the tail is " + tailIds.map(i=>CC.find(x=>x.i===i).n).join(", "));
+  S.ccSort = "vol";
+
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 
   console.log("\nsample markup:", A.slice(A.indexOf("<span class=\"slot full"), A.indexOf("<span class=\"slot full")+230).replace(/\s+/g," "));
