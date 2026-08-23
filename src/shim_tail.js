@@ -853,8 +853,11 @@ setTimeout(()=>{ try{
      calibration. Build a lane matching the pod's measured patients-per-hour and compare there. */
   const target = D.doc_lam * 9;                        // the pod's own intake over its span
   const byShare = CC.slice().sort((a, b) => b.s - a.s);
+  /* ⚠ AT loadPct 100, THE SHARED SETTING. The 16.8 min was measured on a real provider who is
+     shared with the department; comparing the model at loadPct 0 compares against a DEDICATED
+     provider the department does not have, and under-reads by ~10 min. */
   const podLane = (docs, ids) => evaluate({mode:"pooled", A:11, R:0, cyc:76, assess:44,
-      assessNo:44, fastDischarge:false, cc:ids.join("."), start:11, len:9, loadPct:0, docs},
+      assessNo:44, fastDischarge:false, cc:ids.join("."), start:11, len:9, loadPct:100, docs},
       LEVELS[1].pts);
   let bestFit = null, podIds = null;
   for(let n = 2; n <= CC.length; n++){
@@ -947,7 +950,11 @@ setTimeout(()=>{ try{
       fastDischarge:false, cc:CC.map(x=>x.i).join("."), start:0, len:24, loadPct:100},
       LEVELS[1].pts).load;
   const mLo = Math.min(...lT), mHi = Math.max(...lT);
-  console.log("quiet hours run faster        :", mLo < 0.95 && mHi > 1.05
+  /* ⚠ DILUTION ONLY. This used to assert the multiplier dips BELOW 1 at quiet hours — which said
+     a shared provider is faster than baseline when the department is empty, and made the model
+     claim that DEDICATING a provider makes a quiet day worse by 3 minutes. Sharing cannot speed
+     anyone up. The floor is 1 (a dedicated provider) and every busier hour only adds. */
+  console.log("sharing only ever dilutes    :", mLo >= 1 && mLo < 1.02 && mHi > 1.1
     ? "yes (x" + mLo.toFixed(2) + " at the quietest hour, x" + mHi.toFixed(2) + " at the busiest)"
     : "FAIL — multiplier spans " + mLo.toFixed(3) + " to " + mHi.toFixed(3));
 

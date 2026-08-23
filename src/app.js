@@ -714,9 +714,15 @@ function evaluate(cfg, dayTotal){
      exactly as it was, 1 is the effect as measured. Clamped because the exponential runs away on
      a heavy day at the peak hour and no measurement supports extrapolating that far. */
   const loadK = (cfg.loadPct ?? 100) / 100;
+  /* ⚠ DILUTION ONLY — IT FLOORS AT 1. Measured from the QUIETEST hour, not the average: centred
+     on the mean the multiplier dipped below 1 at quiet times, which says a shared provider is
+     FASTER than baseline when the department is empty. Sharing cannot speed anyone up. So the
+     dial at 0 is a DEDICATED provider (never diluted) and every other setting only ever adds.
+     doc_min is rebased to the undiluted floor in the pipeline, so the fit at average crowding —
+     the conditions it was inverted from — is unchanged. */
   const load = (D.occ24 && D.load_beta)
-    ? hours.map(h => Math.max(0.6, Math.min(1.8,
-        Math.exp(loadK * D.load_beta * (D.occ24[h % 24] * fac - D.occ_ref)))))
+    ? hours.map(h => Math.max(1, Math.min(2.2,
+        Math.exp(loadK * D.load_beta * (D.occ24[h % 24] * fac - (D.occ_floor ?? D.occ_ref))))))
     : null;
 
   const o = accepted < 0.05 ? {idle:true, docWait:0, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
