@@ -73,8 +73,10 @@ setTimeout(()=>{
      and a copy that mirrors the handler cannot detect the handler drifting — while CLAUDE.md
      records "a board row must load as the lane that was ranked" as the SAME BUG TWICE. */
   try{
-    const btn = document.getElementById("boardBody").querySelectorAll("[data-load]")
-                  .find(b => b.dataset.load === "42");
+    /* row identity is the RENDERED POSITION now (`at` is not unique — a blank timestamp cell
+       coerces to 0 in the sheet), so the guard clicks the row's own button rather than hunting
+       a timestamp. One row is saved, so it is the first. */
+    const btn = document.getElementById("boardBody").querySelectorAll("[data-load]")[0];
     if(!btn || typeof btn.onclick !== "function") throw new Error("no load handler on the row");
     btn.onclick();
     run(); S.A=5; run();
@@ -426,7 +428,16 @@ setTimeout(()=>{
         bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair,
         roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
       location.hash = encodeURIComponent(hashState());
-      S.assessNo=0; S.turnRoom=0; S.turnChair=0; PICK=new Set(); BEDPICK=new Set();
+      /* ⚠ SCRAMBLE EVERY FIELD, NOT A CHOSEN FEW. This wiped only assessNo, the two turnover
+         values and the two id sets — so a field fromHash() never READS simply kept the value the
+         fixture had just set and compared equal. That is exactly how a dropped `cyc` read (a
+         stray trailing comment swallowed the line) round-tripped "cleanly" for a day while every
+         refresh silently discarded the turnover setting. A field that is not clobbered here
+         cannot be tested here. */
+      Object.assign(S, {mode:"pooled", A:1, R:0, cyc:55, assess:10, assessNo:0, fastDischarge:false,
+        start:0, len:24, level:0, bedExtra:0, bedIntp:false, bedGrp:true,
+        turnRoom:0, turnChair:0, roomsA:false});
+      PICK=new Set(); BEDPICK=new Set();
       fromHash();
       const got = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
         fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
@@ -585,6 +596,23 @@ setTimeout(()=>{
   };
   const asc = a => a.every((v,k) => k===0 || a[k-1] <= v);
   const A1 = printed();
+  /* ⚠ THE DEFAULT ORDER IS AN ORDER TOO. Three orders were asserted against their own columns and
+     this one only against "differs from fast, same set" — so it went unnoticed that it did no
+     sorting at all: it was the raw data.json sequence, which ranks ids 0-23 by share and then
+     APPENDS the two aggregate rows, putting the single biggest bucket (24.2% of the lane) dead
+     last in the view you choose to see where the volume is. */
+  S.ccSort = "vol"; run();
+  const volIds = [...document.getElementById("ccList").innerHTML.matchAll(/data-cc="(\d+)"/g)]
+      .map(m => Number(m[1]));
+  const volSh = volIds.map(i => CC.find(x => x.i === i).s);
+  const biggest = CC.reduce((a, b) => b.s > a.s ? b : a);
+  console.log("arrivals order descends     :",
+    volSh.length === CC.length && volSh.every((v,k) => k===0 || volSh[k-1] >= v)
+    && volIds[0] === biggest.i
+      ? "yes (" + (100*volSh[0]).toFixed(1) + "% down to " + (100*volSh[volSh.length-1]).toFixed(1) + "%)"
+      : "FAIL — biggest bucket at position " + (volIds.indexOf(biggest.i)+1) + " of " + volIds.length);
+  S.ccSort = "fast"; run();
+
   console.log("no-test order reads ascending:",
     ddSeq.every((v,k) => k===0 || ddSeq[k-1] <= v + 1e-9) && A1.noTest.length > 10 && asc(A1.noTest)
       ? "yes (" + A1.noTest[0] + " to " + A1.noTest[A1.noTest.length-1] + " min printed)"

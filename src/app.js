@@ -29,7 +29,20 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
 
    People waiting to be seen queue in the main waiting room, not in either area, so a queue can
    never occupy the space a finishing patient needs to vacate one. The lane closes at CLOSE and
-   anyone still queueing goes to the main department. */
+   anyone still WAITING TO BE SEEN (`qa`) goes to the main department.
+
+   ⚠ THAT IS NOT TRUE OF `qr`, AND THE DIFFERENCE IS VISIBLE IN THE SCORE. `qr` holds patients who
+   have been assessed and are waiting for a second-area space. They keep waiting past CLOSE, and
+   with a starved second area the wait is unbounded: on split 14+1 over an 8-hour lane, 20 patients
+   are still blocked and the recorded evening runs to 1,031 minutes — nine hours after the lane
+   shut. It also makes the score NON-MONOTONE in the primary slider, because more assessment
+   spaces feed more patients into the same bottleneck: at R=1, going A=1 -> 14 moves the score
+   137.6 -> 285.8, so adding a space appears to cost up to +38.6 min.
+   Benign at R>=4 (the R=4 row is flat at 46-50 across every A), so this is confined to layouts
+   with a starved second area — which the sliders do reach, since R floors at 1.
+   NOT CHANGED, deliberately: whether a mid-care patient is diverted at closing or finishes where
+   they are is a modelling decision about the real department, not a coding one, and either choice
+   moves every published comparison between the layouts. It needs an operator's answer first. */
 function sim(cfg){
   const {A, R, lam, asw, now, res, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
@@ -610,8 +623,15 @@ const scale  = (pool,f) => pool.map(x => x*f);
    the case that under-charges — so it says so: `roomsA` marks a divided lane whose assessment side
    is rooms, set by that preset and by the control under Spaces. The second area is chairs either
    way; nobody has proposed a layout whose results-pending side is rooms. */
+/* ⚠ roomsA IS A DIVIDED-LANE SETTING AND MUST NOT REACH POOLED. The chairs/rooms control is
+   rendered only in the split layout, but this charged room turnover on `cfg.roomsA` unscoped —
+   so setting it in split and then switching to pooled left a pooled lane paying room turnover
+   with no control on screen to explain it (+5.0 min at 5 spaces), and field 16 of the hash
+   carried the invisible charge into every shared link. Both comments nearby already said the
+   pooled lane is chairs. */
 const turnFor = cfg => ({
-  turnA: (cfg.mode === "bedfirst" || cfg.mode === "stream" || cfg.roomsA)
+  turnA: (cfg.mode === "bedfirst" || cfg.mode === "stream"
+          || (cfg.roomsA && cfg.mode !== "pooled"))
            ? (cfg.turnRoom ?? 0) : (cfg.turnChair ?? 0),
   turnB: cfg.turnChair ?? 0});
 
@@ -866,6 +886,13 @@ function fitEstate(m, held){
   return [a, Math.max(1, Math.min(LIM.R[1], held - a))];
 }
 function lim(k, v, dflt){
+  /* ⚠ BLANK IS ABSENT, NOT ZERO. `+null` and `+""` are 0 — finite — so an omitted field skipped
+     the default and clamped to the slider MINIMUM instead. serve_board.py stores an omitted key
+     as an explicit null while Apps Script omits it, so the SAME legacy row scored 32.65 through
+     one backend and 49.96 through the other, with the window collapsed to 2h. Two backends
+     disagreeing about one row is the "the page and the board cannot disagree about a lane"
+     promise failing at its own seam. */
+  if(v === null || v === undefined || String(v).trim() === "") return dflt;
   const n = Math.round(+v);
   if(!Number.isFinite(n)) return dflt;
   return Math.min(LIM[k][1], Math.max(LIM[k][0], n));
@@ -1154,7 +1181,14 @@ const LB_KEY  = "chairlab.board.v1";
 const API_KEY = "chairlab.endpoint.v1";
 let SHARED = false, cache = [], API = null;
 
-const localBoard = () => { try{ return JSON.parse(localStorage.getItem(LB_KEY)||"[]") }catch(e){ return [] } };
+/* ⚠ GUARD THE SHAPE, NOT JUST THE PARSE. The try/catch caught bad JSON but not bad CONTENT, and
+   drawBoard runs inside run() — so a single `[null]` row threw on every recompute and, because it
+   is stored, survived reload: the page stayed dead until site data was cleared by hand. */
+const localBoard = () => { try{
+    const b = JSON.parse(localStorage.getItem(LB_KEY) || "[]");
+    return Array.isArray(b) ? b.filter(r => r && typeof r === "object" && r.cfg
+                                            && typeof r.cfg === "object") : [];
+  }catch(e){ return [] } };
 const saveLocal  = b => { try{ localStorage.setItem(LB_KEY, JSON.stringify(b.slice(-40))) }catch(e){} };
 const board      = () => SHARED ? cache : localBoard();
 
@@ -1166,9 +1200,21 @@ const board      = () => SHARED ? cache : localBoard();
    and it reaches staff names + chair layouts only, never patient data. ?board= still wins, so
    a second group can run its own board off the same page. */
 const DEFAULT_BOARD = "https://script.google.com/macros/s/AKfycbx91tZp5wYvxwMoGJhMV2fnHUrV7P6uCo-TrIU8orxauPGErNzqYkKV6fwLWXM6auKC/exec";
+/* ⚠ EVERY BOARD-SUPPLIED STRING GOES THROUGH HERE. Rows are typed by other people and rendered
+   into innerHTML; nothing escaped them, and `<img src=x onerror=...>` is 28 characters, which is
+   exactly the name cap the Apps Script enforces — so it survives intact and runs for everyone who
+   opens the leaderboard. The board URL gets forwarded around a department, so one row reaches
+   every reader and can rewrite the scores they are deciding on. */
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
 function endpointFromEnv(){
   const q = new URLSearchParams(location.search).get("board");
-  if(q) return q;                                  // a link's board wins, for this visit only
+  /* ⚠ AN ENDPOINT FROM A QUERY STRING IS UNTRUSTED. This adopted whatever ?board= carried, so a
+     forwarded link could point the board at any host — or at a javascript:/data: URL. It must be
+     an https Apps Script exec address; anything else is ignored and the default stands. */
+  if(q && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(q)) return q;
+  if(q) console.warn("ignored a ?board= address that is not an Apps Script exec URL");
   try{
     const s = localStorage.getItem(API_KEY);
     // Anyone who opened the pre-2026-08-21 link had the address auto-persisted, which now reads
@@ -1295,6 +1341,13 @@ async function addEntry(){
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
                bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
+               /* ⚠ NO bedShare HERE, DELIBERATELY. A sweep flagged that the board scores on
+                  `cfg.bedShare` while addEntry never wrote it. But evaluate() honours that field
+                  ONLY when `cfg.bedcc === undefined` (line ~650), i.e. for rows saved before the
+                  per-complaint list existed — every new row carries bedcc, so writing it here is
+                  inert. It is also a trap: that path divides by 100, and liveBedShare() already
+                  returns a fraction, so a future change making it live would be 100x wrong.
+                  The legacy-row discrepancy is real but confined to rows nobody can create now. */
                assessNo:S.assessNo,
                cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len};
   const entry = {who, cfg, at: Date.now()};
@@ -1327,7 +1380,7 @@ function drawBoard(){
                 : r.cfg.mode==="stream" ? `${r.cfg.A} rooms + ${r.cfg.R} chairs, apart`
                 : `${r.cfg.A}+${r.cfg.R}`;
     const big = r.spaces > most;
-    return `<tr><td class="num">${i+1}</td><td>${r.who}</td>
+    return `<tr><td class="num">${i+1}</td><td>${esc(r.who)}</td>
       <td>${shape}</td>
       <td class="num${big?" warn":""}">${r.spaces}</td>
       <td class="num">${r.win}<span class="sub"> · ${r.len}h</span></td>
@@ -1338,11 +1391,17 @@ function drawBoard(){
       <td class="num${r.cover<0.2?" warn":""}">${Math.round(100*r.cover)}%</td>
       <td class="num">${r.empty?"—":r.worst.toFixed(0)}</td>
       <td class="num${r.divPct>2?" warn":""}">${r.div.toFixed(1)}</td>
-      <td><button type="button" class="mini" data-load="${r.at}">load</button></td></tr>`;
+      <td><button type="button" class="mini" data-load="${i}">load</button></td></tr>`;
   }).join("") : `<tr><td colspan="10" class="empty">Nothing saved yet. Build a lane you like, put your
                  name in and add it — the board ranks on delay per arriving patient.</td></tr>`;
+  /* ⚠ ROW IDENTITY IS THE RENDERED POSITION, NOT `at`. `at` is not unique by construction —
+     shared-board.gs does `Number(r[7]) || 0`, so every blank or retyped timestamp cell collapses
+     to 0 — and this looked the row up with `.find(x => x.at === ...)`, which returns the FIRST
+     match. Click the second row sharing a timestamp and you silently loaded the first one's lane,
+     with the shape column above still reading the lane you asked for. `rows` is the array this
+     same render just drew, so the index cannot point anywhere else. */
   $("boardBody").querySelectorAll("[data-load]").forEach(btn=>btn.onclick=()=>{
-    const e = board().find(x=>String(x.at)===btn.dataset.load); if(!e) return;
+    const e = rows[Number(btn.dataset.load)]; if(!e) return;
     /* ⚠ sane() IS THE ONLY READING OF A ROW. It clamps, it falls back to split for a legacy
        'zone'/'rooms' row (modeOf() returning undefined killed drawSpaces and then every
        subsequent run() until reload), and it supplies the 15:00-23:00 window a pre-window row
@@ -1443,7 +1502,13 @@ function fromHash(){
      dead and no visible error. Exactly the failure the comment above commemorates — that guard
      caught the out-of-RANGE case and not the wrong-TYPE one. */
   const lvl = Number.isFinite(rawLvl) ? Math.max(0, Math.min(LEVELS.length-1, Math.round(rawLvl))) : 1;
-  Object.assign(S, {mode:p[0], A:lim("A",p[1],6), R:lim("R",p[2],4),   // refit below cyc:lim("cyc",p[3],Math.round(D.T_A)),
+  /* ⚠ NO TRAILING COMMENTS IN THIS LITERAL. A `// refit below` note appended to the R line
+     joined onto the next one and commented out the `cyc` read — silently, for a day. It was the
+     only one of 16 fields dropped, so a plain REFRESH (run() rewrites the hash constantly)
+     discarded the turnover setting and rescored the lane: a tight stream lane read 47.1 min per
+     arrival, and 32.9 after a reload. The refit note now lives on its own line below. */
+  Object.assign(S, {mode:p[0], A:lim("A",p[1],6), R:lim("R",p[2],4),
+                    cyc:lim("cyc",p[3],Math.round(D.T_A)),
                     assess:lim("assess",p[4],44), fastDischarge:p[5]==="1", level:lvl, budget:0,
                     start: p.length>=9 ? lim("start",p[7],15) : 15,
                     len:   p.length>=9 ? lim("len",p[8],8)    : 8});
@@ -1669,7 +1734,12 @@ function drawCriteria(){
       ? CC.slice().sort((p, q) => p.ddall - q.ddall)
     : S.ccSort === "test"
       ? CC.slice().sort((p, q) => p.w - q.w || rank(p, q))
-    : CC;
+    /* ⚠ THIS ORDER USED TO BE A BARE `CC` — i.e. no sort at all, just the order data.json happens
+       to carry, which ranks ids 0-23 by share and then APPENDS the two aggregate rows. So
+       "Everything else (209 complaints)" at 24.2% of the lane, larger than the row at the top,
+       rendered dead last. This is the order you pick to see which complaints carry the volume,
+       and scanning down until the numbers get small skipped the biggest bucket on the page. */
+    : CC.slice().sort((p, q) => q.s - p.s);
   $("ccList").innerHTML = order.map(x=>{
     const on = PICK.has(x.i), bed = BEDPICK.has(x.i);
     return `<div class="cc-row${on?" on":""}${bed&&bedMode?" bed":""}">
@@ -1890,7 +1960,12 @@ function run(){
   // the numbers describe another is worse than no stage
   if(PLAY.trace){ PLAY.trace = null; PLAY.runs = null; PLAY.pick = 0; playPause(false); PLAY.t = 0; }
   if(!PLAY.trace){ drawStageIdle(); $("reroll").hidden = true;
-    if(PLAY.expect < 0.05){ $("stageHint").textContent = "Nothing is selected, so nobody arrives."; }
+    /* ⚠ ASK THE LANE, NOT THE LAST TRACE. `PLAY.expect` is written only by buildTrace(), which
+       runs when someone presses Play — it starts at 0, so the first run() at load overwrote the
+       caption with "Nothing is selected, so nobody arrives." while all 26 complaints were
+       selected and the hero card beside it read 26.5 patients. After that it always described
+       the PREVIOUS configuration. mix().share is current by construction. */
+    if(mix().share < 0.002){ $("stageHint").textContent = "Nothing is selected, so nobody arrives."; }
   else $("stageHint").textContent = "The same run the numbers come from — one simulated day, replayed "
       + "on a clock. A space that looks full is full."; }
   // keep the query string — it carries ?board=, and replacing the URL with a bare hash would
