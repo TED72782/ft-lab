@@ -132,7 +132,12 @@ function sim(cfg){
         if(!docs) return 0;
         let i = 0; for(let j = 1; j < docFree.length; j++) if(docFree[j] < docFree[i]) i = j;
         const start = Math.max(t, docFree[i]);
-        docFree[i] = start + docMin;
+        /* ⚠ VARIABLE, NOT FIXED. docMin is inverted from the observed queue by M/M/1, which
+           assumes exponential service — implement it as a CONSTANT and you get M/D/1, whose wait
+           is exactly HALF for the same mean. The guard caught precisely that factor of two (8.4
+           modelled against 16.8 measured). Physician time per patient is variable anyway; a fixed
+           number was the modelling error, not the inversion. */
+        docFree[i] = start + expo(r, 1/docMin);   // expo() takes a RATE, not a mean
         qSum += start - t; qN++;
         return start - t; };
       const holdOf = (t, w, raw) => docs

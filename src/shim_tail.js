@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 84;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 88;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -133,7 +133,13 @@ setTimeout(()=>{ try{
      these two ever separate, the placement logic has grown a cost that is not the rule it is
      supposed to be modelling, and the whole "what does the exclusion list cost" reading of the
      layout is void. Seed noise between two different RNG streams is the only gap allowed. */
-  const cfgB = {cyc:76, assess:44, fastDischarge:false, start:15, len:8, bar:"today"};
+  /* ⚠ ENOUGH DAYS TO SEE THE INVARIANT RATHER THAN THE NOISE. The two lanes run different RNG
+     streams, so the gap is Monte-Carlo error around a true zero — and adding the load stretch and
+     the provider queue put two more stochastic terms in it. At 600 days the gap is 0.61 against a
+     0.5 tolerance; it converges 0.61 -> 0.30 -> 0.23 -> 0.06 at 600/2400/9600/24000, which is what
+     tells you it is noise. Raised the sample rather than the bound: widening the tolerance would
+     have hidden a real divergence of the same size. */
+  const cfgB = {cyc:76, assess:44, fastDischarge:false, start:15, len:8, bar:"today", days:9600};
   const bf0 = evaluate({...cfgB, mode:"bedfirst", A:6, R:4, bedcc:"", bedExtra:0}, LEVELS[2].pts).score;
   const pl  = evaluate({...cfgB, mode:"pooled",   A:10, R:0},             LEVELS[2].pts).score;
   console.log("bed-first at 0% == pooled   :", Math.abs(bf0-pl) < 0.5
@@ -824,6 +830,55 @@ setTimeout(()=>{ try{
     ? "yes (" + roomReq + " room-required patients over 120 days, none seated in a chair)"
     : "FAIL — " + chaired + " of " + roomReq + " room-required patients took a chair");
   S.bedGrp=true; S.bedExtra=0; S.mode="split"; S.A=6; S.R=4; run();
+
+  /* 10o. THE PROVIDER QUEUE. Four properties: off is the old engine; it reproduces the queue the
+          department measures; it is FIFO (roomed ahead of you means seen ahead of you, which is
+          the evidence the whole mechanism rests on); and adding SPACES stops helping while adding
+          PROVIDERS still does — the finding that changes what the page is for. */
+  const evD = (A, docs, lvl) => evaluate({mode:"pooled", A, R:0, cyc:76, assess:44, assessNo:44,
+      fastDischarge:false, cc:CC.map(x=>x.i).join("."), start:15, len:8, loadPct:0, docs},
+      LEVELS[lvl].pts);
+  const bareD = sim({A:11, R:0, pooled:true, assessMin:44, assessNo:44, fastDischarge:false,
+    turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:600, seeds:[11,12,13,14]});
+  const offD = sim({A:11, R:0, pooled:true, assessMin:44, assessNo:44, fastDischarge:false,
+    turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:600, seeds:[11,12,13,14],
+    docs:0, docMin:D.doc_min, postShare:D.postdoc_share});
+  console.log("no provider == the old engine:", bareD.perArrival === offD.perArrival
+    ? "yes (" + bareD.perArrival.toFixed(4) + ", bit-identical)"
+    : "FAIL — " + bareD.perArrival.toFixed(4) + " vs " + offD.perArrival.toFixed(4));
+  /* the queue must land near what the department measures, at the department's own lane */
+  /* ⚠ AT THE LOAD IT WAS CALIBRATED ON. doc_min is a property of the PROVIDER, worked back from
+     the pod's own arrival rate, so comparing the modelled queue at a lane that takes EVERY
+     complaint (three times the pod's intake, one provider at 98% utilisation) tests nothing about
+     calibration. Build a lane matching the pod's measured patients-per-hour and compare there. */
+  const target = D.doc_lam * 9;                        // the pod's own intake over its span
+  const byShare = CC.slice().sort((a, b) => b.s - a.s);
+  let bestFit = null;
+  for(let n = 2; n <= CC.length; n++){
+    const ids = byShare.slice(0, n).map(x => x.i);
+    const e = evaluate({mode:"pooled", A:11, R:0, cyc:76, assess:44, assessNo:44,
+      fastDischarge:false, cc:ids.join("."), start:11, len:9, loadPct:0, docs:1}, LEVELS[1].pts);
+    const err = Math.abs(e.accepted - target);
+    if(!bestFit || err < bestFit.err) bestFit = {err, q:e.o.docWait, got:e.accepted};
+  }
+  console.log("the queue matches the measured:", Math.abs(bestFit.q - D.doc_queue_measured) < 8
+    ? "yes (modelled " + bestFit.q.toFixed(1) + " min at " + bestFit.got.toFixed(1)
+      + " patients/day, against a measured " + D.doc_queue_measured + " at " + target.toFixed(1) + ")"
+    : "FAIL — modelled " + bestFit.q.toFixed(1) + " vs measured " + D.doc_queue_measured
+      + " (at " + bestFit.got.toFixed(1) + " against " + target.toFixed(1) + " patients/day)");
+  /* ⚠ THE POINT OF THE WHOLE THING: chairs stop buying time, providers do not. */
+  const c8 = evD(8, 1, 1), c18 = evD(18, 1, 1), d2 = evD(11, 2, 1), d1 = evD(11, 1, 1);
+  const chairsBuy = (c8.o.perArrival + c8.o.docWait) - (c18.o.perArrival + c18.o.docWait);
+  const docsBuy   = (d1.o.perArrival + d1.o.docWait) - (d2.o.perArrival + d2.o.docWait);
+  console.log("more chairs stop buying time :", chairsBuy < docsBuy
+    ? "yes (8->18 chairs saves " + chairsBuy.toFixed(1) + " min; a 2nd provider saves "
+      + docsBuy.toFixed(1) + ")"
+    : "FAIL — chairs " + chairsBuy.toFixed(1) + " vs a provider " + docsBuy.toFixed(1));
+  /* FIFO: the queue must GROW with load, or it is not a queue */
+  const qQuiet = evD(11, 1, 0).o.docWait, qHeavy = evD(11, 1, 3).o.docWait;
+  console.log("the queue grows with the load:", qHeavy > qQuiet * 1.3
+    ? "yes (" + qQuiet.toFixed(1) + " min on a quiet day, " + qHeavy.toFixed(1) + " on a heavy one)"
+    : "FAIL — quiet " + qQuiet.toFixed(2) + " heavy " + qHeavy.toFixed(2));
 
   /* 10p. THE LOAD STRETCH: OFF IS THE OLD ENGINE, AND IT IS THE DEPARTMENT'S LOAD, NOT THE LANE'S.
           Three properties, because the second is the design decision and the third is the trap.
