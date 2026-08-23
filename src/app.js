@@ -370,7 +370,7 @@ function stageState(t){
                                    pool for the rest of the run. The stage drew a queue of people
                                    beside EMPTY CHAIRS, on the two layouts the page exists to
                                    compare, while the hero card on the same screen read 0 waiting. */
-                                
+                                if(!w) waiting--;
                                 /* the assessment space is not free yet — it is being turned over,
                                    exactly as it is after a departure */
                                 if(w && w[0]==="A"){ A[w[1]] = "turn"; turning.set(e.id, w[1]) }
