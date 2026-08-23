@@ -911,7 +911,7 @@ function sim(cfg){
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        /* ⚠ THE CROWDING MULTIPLIER IS ON THE PROVIDER, NOT ON THE PATIENT'S CARE — corrected
+        /* ⚠ THE CROWDING MULTIPLIER DELAYS THE START OF CARE, NOT CARE ITSELF — corrected
            once the queue above existed, and the correction is the operator's question answered.
            It was first fitted on the WHOLE space hold and applied here. But the whole hold
            CONTAINS the roomed-to-doctor queue, and split apart the effect is entirely the queue:
@@ -1474,12 +1474,17 @@ function evaluate(cfg, dayTotal){
      exactly as it was, 1 is the effect as measured. Clamped because the exponential runs away on
      a heavy day at the peak hour and no measurement supports extrapolating that far. */
   const loadK = (cfg.loadPct ?? 100) / 100;
-  /* ⚠ DILUTION ONLY — IT FLOORS AT 1. Measured from the QUIETEST hour, not the average: centred
-     on the mean the multiplier dipped below 1 at quiet times, which says a shared provider is
-     FASTER than baseline when the department is empty. Sharing cannot speed anyone up. So the
-     dial at 0 is a DEDICATED provider (never diluted) and every other setting only ever adds.
-     doc_min is rebased to the undiluted floor in the pipeline, so the fit at average crowding —
-     the conditions it was inverted from — is unchanged. */
+  /* ⚠ DELAY ONLY — IT FLOORS AT 1. Measured from the QUIETEST hour, not the average: centred on
+     the mean it dipped below 1, which would say an empty department makes the lane FASTER than
+     its own baseline. Crowding can add delay; its absence is the floor, not a bonus.
+     ⚠ AND IT IS NOT THE PROVIDER. The lane has a DEDICATED doctor 11:00-21:00 (operator,
+     2026-08-23) and inside those hours the effect is undiminished: +8.1% per patient (t=3.87)
+     with the lane's own load controlled at 30 min, at 2 h, and by its standing occupancy. So the
+     shared resource is something else — nursing and room preparation are the candidates, and a
+     documentation-timing artefact cannot be excluded. It is applied to the service time because
+     that is the only lever the engine has on the time-to-be-seen; the LABEL must not claim it is
+     the doctor. doc_min is rebased to the undelayed floor in the pipeline, so the fit at average
+     crowding — the conditions it was inverted from — is unchanged. */
   const load = (D.occ24 && D.load_beta)
     ? hours.map(h => Math.max(1, Math.min(2.2,
         Math.exp(loadK * D.load_beta * (D.occ24[h % 24] * fac - (D.occ_floor ?? D.occ_ref))))))
@@ -1876,7 +1881,7 @@ function drawTurn(){
          <label for="trc">Turning over a chair</label><output class="num" id="trcOut"></output></div>
        <input type="range" id="trc" min="0" max="15" step="1" value="${S.turnChair}"></div>
        <div class="ctl"><div class="ctl-top">
-         <label for="ldk">How much a busy department ties up the provider</label>
+         <label for="ldk">How much a busy department delays being seen</label>
          <output class="num" id="ldkOut"></output></div>
        <input type="range" id="ldk" min="0" max="200" step="10" value="${S.loadPct}"></div>
        <div class="ctl"><div class="ctl-top">
@@ -1890,15 +1895,18 @@ function drawTurn(){
          <i>ahead</i> of you; how full the lane is predicts nothing. Each provider is modelled at
          <b>{{docmin}} minutes</b> a patient, worked back from that queue rather than assumed.
          <b>0 removes the queue</b> and scores spaces alone, as this page did before.</div>
-       <div class="hint">When the rest of the department is full, the provider is <b>less
-         available to this lane</b> &mdash; and that, not slower care, is what crowding does here.
-         Split the wait apart and the whole effect sits in the time to be <i>seen</i> (+15% per
-         extra patient in the building); the time from the doctor arriving to the patient leaving
-         moves <b>+0.5%, which is nothing</b>. So this dial lengthens the provider's own minutes,
-         by about <b>3.4% per extra patient</b>, and leaves care alone. <b>It does nothing with no
-         provider set below.</b> 100% is the effect as measured; 0 turns it off. Whether crowding
-         <i>causes</i> it is not established &mdash; a slow shift produces both &mdash; which is
-         why it is a dial.</div>`;
+       <div class="hint">When the rest of the department is full, patients here wait longer to be
+         <b>seen</b> &mdash; and only to be seen. Split the wait apart and the whole effect sits
+         before the doctor arrives (+15% per extra patient in the building); the time from the
+         doctor arriving to the patient leaving moves <b>+0.5%, which is nothing</b>. Crowding does
+         not slow care, it delays its start.
+         <b>&#9888; It is not the doctor being pulled away.</b> This lane has a dedicated provider
+         from 11:00 to 21:00, and inside those hours the effect is undiminished (+8% per patient,
+         even after allowing for how busy the lane itself is). So something else shared with the
+         department &mdash; nursing and room preparation are the obvious candidates, and
+         documentation timing cannot be ruled out &mdash; is what actually delays the start. This
+         dial reproduces that delay; it does not explain it. 100% is what today measures, 0 removes
+         it.</div>`;
     $("trn").oninput = e => { S.turnRoom  = +e.target.value; syncTurn(); requestRun() };
     $("trc").oninput = e => { S.turnChair = +e.target.value; syncTurn(); requestRun() };
     $("ldk").oninput = e => { S.loadPct   = +e.target.value; syncTurn(); requestRun() };

@@ -951,10 +951,10 @@ setTimeout(()=>{ try{
       LEVELS[1].pts).load;
   const mLo = Math.min(...lT), mHi = Math.max(...lT);
   /* ⚠ DILUTION ONLY. This used to assert the multiplier dips BELOW 1 at quiet hours — which said
-     a shared provider is faster than baseline when the department is empty, and made the model
-     claim that DEDICATING a provider makes a quiet day worse by 3 minutes. Sharing cannot speed
-     anyone up. The floor is 1 (a dedicated provider) and every busier hour only adds. */
-  console.log("sharing only ever dilutes    :", mLo >= 1 && mLo < 1.02 && mHi > 1.1
+     an EMPTY department makes this lane faster than its own baseline, and made the model claim
+     that removing the crowding effect makes a quiet day WORSE by 3 minutes. Crowding can add
+     delay; its absence is the floor, not a bonus. Every busier hour only ever adds. */
+  console.log("crowding only ever delays    :", mLo >= 1 && mLo < 1.02 && mHi > 1.1
     ? "yes (x" + mLo.toFixed(2) + " at the quietest hour, x" + mHi.toFixed(2) + " at the busiest)"
     : "FAIL — multiplier spans " + mLo.toFixed(3) + " to " + mHi.toFixed(3));
 
