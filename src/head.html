@@ -128,6 +128,10 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--hold)}
   font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.02em}
 .stat .k{font-size:12px;color:var(--ink-3);margin-top:3px}
 .stat.is-hold .v{color:var(--hold)} .stat.is-breach .v{color:var(--breach)}
+/* the stream boards mark a breached figure on the .num itself, not on a .stat wrapper —
+   without this the red never applied and a room stream carrying 94 min a patient rendered
+   in normal ink. */
+.num.is-breach{color:var(--breach)}
 
 .load{margin:-6px 0 16px;padding:10px 14px;border-radius:8px;font-size:13px;
   background:var(--surface-2);border:1px solid var(--line-soft);color:var(--ink-2)}

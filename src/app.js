@@ -363,6 +363,14 @@ function stageState(t){
     if(e.ev === "arrive"){ waiting++; test.set(e.id, e.test) }
     else if(e.ev === "assess"){ waiting--; A[e.slot] = e.id; where.set(e.id, ["A", e.slot]); stuck.delete(e.id) }
     else if(e.ev === "second"){ const w = where.get(e.id);
+                                /* ⚠ A CHAIR PATIENT MAY NEVER HAVE BEEN ASSESSED IN A SPACE. In
+                                   bed-first and stream, startChair() emits `second` straight from
+                                   the queue with no preceding `assess`, and only `assess` used to
+                                   decrement — so every chair-seated patient stayed in the waiting
+                                   pool for the rest of the run. The stage drew a queue of people
+                                   beside EMPTY CHAIRS, on the two layouts the page exists to
+                                   compare, while the hero card on the same screen read 0 waiting. */
+                                if(!w) waiting--;
                                 /* the assessment space is not free yet — it is being turned over,
                                    exactly as it is after a departure */
                                 if(w && w[0]==="A"){ A[w[1]] = "turn"; turning.set(e.id, w[1]) }
@@ -834,8 +842,29 @@ const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
    page: drawStageIdle() does `new Array(S.A)`, and new Array(NaN) — or (-3), or (6.5) — throws
    RangeError, which happened before a single button was wired, so Add / Play / Copy link were
    all inert. Limits mirror the sliders, so a clamped link lands somewhere the UI can show. */
-const LIM = {A:[1,14], R:[1,16], cyc:[55,115], assess:[10,90], assessNo:[10,120],
+const LIM = {A:[1,30], R:[0,16], cyc:[55,115], assess:[10,90], assessNo:[10,120],
              start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15]};
+/* ⚠ ONE PLACE DECIDES WHAT A LAYOUT CAN HOLD. A divided lane splits across two sliders (14+16)
+   while a pooled one has a single slider, so the same estate is not representable the same way —
+   and the mode switch used to resolve that by DISCARDING the difference. It refits instead: the
+   estate is the invariant, the split is not. `S.R` is 0 in a pooled lane and that is a real value,
+   not a missing one, which is why LIM.R now floors at 0 (clamping it up to 1 handed a pooled lane
+   an extra space every time it went through a link). */
+const A_MAX = m => m && m.hasR ? 14 : LIM.A[1];
+/* Every way a lane can ARRIVE — a link, a board row, a preset — goes through here, so a lane the
+   sliders could not show cannot exist. Without it a hand-typed or older link lands on a layout
+   whose slider caps below its own value, and the readout and the engine disagree. */
+function fitLane(mode, A, R){
+  const m = MODES.find(x=>x.id===mode) || MODES[0];
+  if(!m.hasR) return [Math.min(A_MAX(m), Math.max(1, A)), 0];
+  if(A > A_MAX(m) || R < 1) return fitEstate(m, Math.max(2, A + Math.max(0, R)));
+  return [A, R];
+}
+function fitEstate(m, held){
+  if(!m.hasR) return [Math.min(A_MAX(m), held), 0];
+  const a = Math.max(LIM.A[0], Math.min(A_MAX(m), held - Math.round(held * 0.4)));
+  return [a, Math.max(1, Math.min(LIM.R[1], held - a))];
+}
 function lim(k, v, dflt){
   const n = Math.round(+v);
   if(!Number.isFinite(n)) return dflt;
@@ -864,9 +893,13 @@ function drawModes(){
     ACTIVE_PRESET = null;                 // a hand-picked layout is no longer a named one
     const held = S.A + (modeOf().hasR ? S.R : 0);
     S.mode=b.dataset.m; S.budget=0; const m=modeOf();
-    if(!m.hasR){ S.A = Math.min(LIM.A[1], held); S.R = 0 }
-    else if(!S.R){ S.A = Math.max(1, held - Math.round(held*0.4)); S.R = held - S.A }
-    if(m.id==="split" && S.A+S.R>16){S.A=6;S.R=4}
+    /* ⚠ AND IT IS PRESERVED ABOVE 14 TOO. `Math.min(LIM.A[1], held)` silently DISCARDED every
+       space over 14 on the way into a pooled layout, and the reset below threw the layout away
+       outright — one click from the shipped '8 rooms + 10 chairs' preset lost 4 spaces and 4
+       points of score, irreversibly, which is the exact ratchet the comment above forbids in the
+       other direction. A pooled layout that cannot hold the estate keeps the remainder in the
+       second area rather than dropping it on the floor. */
+    if(!m.hasR || !S.R) [S.A, S.R] = fitEstate(m, held);
     drawModes();drawSpaces();drawPresets();run();
   });
 }
@@ -888,7 +921,7 @@ function drawSpaces(){
   rows.push(ctl("A", m.id==="pooled" ? "Spaces in the group"
                   : m.id==="bedfirst" ? "ED rooms the lane can use"
                   : m.id==="stream"   ? "Rooms — for the patients sorted to them" : "Assessment spaces",
-                S.A, 1, 14));
+                S.A, 1, A_MAX(m)));
   if(m.hasR) rows.push(ctl("R", m.id==="bedfirst" ? "Chairs — overflow only"
                              : m.id==="stream"   ? "Chairs — for everyone else"
                              : "Second area — results &amp; discharge pending",
@@ -1207,7 +1240,8 @@ function setEndpoint(url){
    the room can retype, and a blank or a typo must not reach the engine as NaN. */
 function sane(cfg){
   const m = MODES.some(x=>x.id===cfg.mode) ? cfg.mode : MODES[0].id;   // 'zone'/'rooms' retired
-  return {mode:m, A:lim("A",cfg.A,6), R:lim("R",cfg.R,4),
+  const [fA, fR] = fitLane(m, lim("A",cfg.A,6), lim("R",cfg.R,4));  // same rule as the link path
+  return {mode:m, A:fA, R:fR,
           cyc:lim("cyc",cfg.cyc,Math.round(D.T_A)), assess:lim("assess",cfg.assess,44),
           fastDischarge: cfg.fastDischarge===true,
           /* A row saved before bed-first existed has neither, and was not that layout anyway.
@@ -1395,10 +1429,11 @@ function fromHash(){
      a page whose first run() happens before a single handler is wired. */
   const rawLvl = p.length===8 ? +p[7] : +p[6];
   const lvl = Number.isFinite(rawLvl) ? Math.max(0, Math.min(LEVELS.length-1, rawLvl)) : 1;
-  Object.assign(S, {mode:p[0], A:lim("A",p[1],6), R:lim("R",p[2],4), cyc:lim("cyc",p[3],Math.round(D.T_A)),
+  Object.assign(S, {mode:p[0], A:lim("A",p[1],6), R:lim("R",p[2],4),   // refit below cyc:lim("cyc",p[3],Math.round(D.T_A)),
                     assess:lim("assess",p[4],44), fastDischarge:p[5]==="1", level:lvl, budget:0,
                     start: p.length>=9 ? lim("start",p[7],15) : 15,
                     len:   p.length>=9 ? lim("len",p[8],8)    : 8});
+  [S.A, S.R] = fitLane(S.mode, S.A, S.R);   // a lane the sliders cannot show must not exist
   /* Fixed layout since 2026-08-22 (see hashState). A link written before a field existed is
      SHORTER, and each default below is what that lane MEANT when it was written — no turnover,
      no interpreter or sibling rule, one assessment time for both halves. Read by index; the

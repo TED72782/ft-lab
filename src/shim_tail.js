@@ -4,18 +4,41 @@ const DEFAULT_ASSESS_NO = S.assessNo;
 setTimeout(()=>{
   S.mode="split";S.A=6;S.R=4;S.start=15;S.len=8;S.assess=44;S.fastDischarge=true;S.level=1;
   PICK=new Set(CC.map(x=>x.i)); run(); buildTrace();
-  PLAY.t=300; drawStage();
-  const A=document.getElementById("stageA").innerHTML;
-  const W=document.getElementById("stageWait").innerHTML;
-  console.log("assessment slots render figures :", (A.match(/<svg/g)||[]).length, "figures in", (A.match(/class="slot/g)||[]).length, "slots");
-  console.log("waiting pool renders figures    :", (W.match(/<svg/g)||[]).length);
-  console.log("test badge appears              :", /class="bg"/.test(A) ? "yes" : "no");
-  console.log("empty slot has no figure        :", /<span class="slot"><\/span>/.test(A) || !A.includes('class="slot">') ? "ok" : "check");
-  // a jammed lane must show red figures
+  /* ⚠ SWEEP THE RUN, DO NOT SAMPLE ONE MINUTE. These four read the stage at t=300 and printed
+     raw counts with no pass/fail wording, so a zero read as noise rather than as a failure — and
+     minute 300 is one of the ~100 minutes of 481 where the assessment area happens to be empty on
+     this seed. The output said "0 figures in 6 slots" and "test badge: no" while the area peaked
+     at 6/6 and the badge first drew at t=59. Which minute you land on changed with any edit, so
+     the checks reported luck. Peaks over the whole run are a property of the run. */
+  let peakFig=0, peakSlot=0, peakWait=0, badge=false, ghost=0;
+  for(let t=0;t<=S.len*60;t++){
+    PLAY.t=t; drawStage();
+    const a=document.getElementById("stageA").innerHTML;
+    peakFig  = Math.max(peakFig,  (a.match(/<svg/g)||[]).length);
+    peakSlot = Math.max(peakSlot, (a.match(/class="slot/g)||[]).length);
+    peakWait = Math.max(peakWait, (document.getElementById("stageWait").innerHTML.match(/<svg/g)||[]).length);
+    if(/class="bg"/.test(a)) badge = true;
+    /* an EMPTY slot must carry no figure. The old form was `/<span class="slot"><\/span>/.test(a)
+       || !a.includes('class="slot">')` — dot() emits `<span class="slot" data-k="-">`, so the
+       first pattern can never match and the second substring can never be present: the whole
+       expression was `false || !false` for every possible stage state. This counts real ghosts. */
+    ghost += (a.match(/<span class="slot"[^>]*>\s*<svg/g)||[]).length
+           - (a.match(/<span class="slot [^>]*>\s*<svg/g)||[]).length;
+  }
+  console.log("assessment slots fill           :", peakFig>0 && peakSlot===6
+    ? "yes (peak "+peakFig+" of "+peakSlot+" over the run)" : "FAIL — peak "+peakFig+"/"+peakSlot);
+  console.log("test badge appears              :", badge ? "yes" : "FAIL — never drawn in 481 minutes");
+  console.log("an empty slot holds no figure   :", ghost<=0 ? "yes (every minute)" : "FAIL — "+ghost+" ghosts");
+  /* A jammed lane must show red figures AND a queue. The waiting-pool check lives here rather
+     than above because a 6+4 lane at this volume never queues — asserting it drew a waiting
+     figure on a lane with no wait is a check that can only fail for the wrong reason. */
   S.A=4;S.R=1;S.assess=30; run(); buildTrace();
-  let jam=0; for(let t=60;t<=480;t+=30){ PLAY.t=t; drawStage();
-    jam=Math.max(jam,(document.getElementById("stageA").innerHTML.match(/fig jam/g)||[]).length) }
-  console.log("jammed lane shows red figures   :", jam, "at peak");
+  let jam=0, jamWait=0;
+  for(let t=0;t<=S.len*60;t++){ PLAY.t=t; drawStage();
+    jam=Math.max(jam,(document.getElementById("stageA").innerHTML.match(/fig jam/g)||[]).length);
+    jamWait=Math.max(jamWait,(document.getElementById("stageWait").innerHTML.match(/<svg/g)||[]).length) }
+  console.log("a jammed lane shows red figures :", jam>0 ? "yes (peak "+jam+")" : "FAIL — none in 481 minutes");
+  console.log("a jammed lane shows its queue   :", jamWait>0 ? "yes (peak "+jamWait+" waiting)" : "FAIL — queue never drawn");
   /* ⚠ THE REGRESSION GUARD. A slot whose occupant has not changed must keep the SAME element
      across frames. Rebuild it every tick and the .22s arrival animation restarts from
      opacity:0 sixty times a second: the boxes change colour and the people never appear. */
@@ -46,12 +69,15 @@ setTimeout(()=>{
   let zOk=true, zMsg="";
   S.start=3; S.len=20; S.level=1;                    // park the live lane far from the saved one
   const rowScore = scoreOf(board()[0].cfg, LEVELS[S.level].pts).score;
+  /* ⚠ CLICK THE REAL BUTTON. This used an inline copy commented "mirrors the shipped handler",
+     and a copy that mirrors the handler cannot detect the handler drifting — while CLAUDE.md
+     records "a board row must load as the lane that was ranked" as the SAME BUG TWICE. */
   try{
-    const e=board().find(x=>String(x.at)==="42");
-    S.budget=0; Object.assign(S, sane(e.cfg));       // mirrors the shipped handler
-    PICK = sane(e.cfg).cc === undefined ? new Set(CC.map(x=>x.i))
-         : new Set(String(sane(e.cfg).cc).split(".").filter(v=>v!=="").map(Number));
-    drawModes(); drawSpaces(); drawWindow(); run(); S.A=5; run();
+    const btn = document.getElementById("boardBody").querySelectorAll("[data-load]")
+                  .find(b => b.dataset.load === "42");
+    if(!btn || typeof btn.onclick !== "function") throw new Error("no load handler on the row");
+    btn.onclick();
+    run(); S.A=5; run();
   }catch(err){ zOk=false; zMsg=err.message }
   console.log("legacy zone row loads       :", zOk ? "yes (as "+S.mode+")" : "FAIL — "+zMsg);
   /* ⚠ LOADING A ROW MUST GIVE BACK THE LANE THAT WAS RANKED. A row saved before the window was
@@ -385,7 +411,12 @@ setTimeout(()=>{
   let rtFail = "";
   for(const m of ["split","pooled","bedfirst","stream"]){
     for(const narrowed of [false, true]){
-      S.mode=m; S.A=6; S.R=4; S.cyc=76; S.assess=44; S.assessNo=51; S.fastDischarge=true;
+      /* ⚠ R=0 IS THE ONLY REACHABLE POOLED STATE, so that is what gets round-tripped. Entering
+         pooled zeroes R (there is no second area to size), and a pooled lane carrying R=4 is a
+         fixture the UI cannot produce. This asserted R survived pooled, which is why the clamp
+         that quietly floored R at 1 — growing every pooled lane by a space on reload — sat here
+         undetected: the fixture never presented the value that broke. */
+      S.mode=m; S.A=6; S.R=(m==="pooled"?0:4); S.cyc=76; S.assess=44; S.assessNo=51; S.fastDischarge=true;
       S.start=15; S.len=8; S.level=2; S.bedExtra=7; S.bedIntp=true; S.bedGrp=false;
       S.turnRoom=13; S.turnChair=2; S.roomsA=(m==="split");
       PICK = narrowed ? new Set([0,1,2]) : new Set(CC.map(x=>x.i));
@@ -610,6 +641,111 @@ setTimeout(()=>{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10z. EVERY WIRED CONTROL MUST ACTUALLY BE WIRED. Seven handlers — the complaint row, its
+          room chip, the three sort buttons, the presets, chairs/rooms, the discharge rule and the
+          board's own load button — were reachable by NO check: replacing all seven `onclick`
+          assignments with a dead property at once still printed 0 FAILs. The mode buttons had a
+          guard, so the pattern existed; it just was not extended. This asserts the handler is a
+          FUNCTION on every element the page renders with one, which is the part a rename or a
+          refactor silently breaks. */
+  S.mode="split"; S.A=6; S.R=4; run();
+  saveLocal([{who:"wired", at: 77, cfg:{mode:"split",A:6,R:4,cyc:76,assess:44,fastDischarge:true}}]);
+  SHARED=false; drawBoard();
+  const wired = [["[data-cc]","ccList"], ["[data-bed]","ccList"], ["[data-sort]","ccSortSeg"],
+                 ["[data-p]","presets"], ["[data-m]","modes"], ["[data-ra]","spaceCtl"],
+                 ["[data-fd]","speedCtl"], ["[data-load]","boardBody"]];
+  const dead = [], checked = [];
+  for(const [sel, host] of wired){
+    const h = document.getElementById(host);
+    const els = h ? h.querySelectorAll(sel) : [];
+    /* ⚠ NOT A PAGE FAULT. Buttons written straight into body.html (the sort segment) are invisible
+       to this stub, which only sees markup the page assigns through innerHTML. Skipping them is a
+       stub limit; the COUNT below is what stops the skip from turning into a vacuous pass. */
+    if(!els.length) continue;
+    checked.push(sel);
+    const n = els.filter(b => typeof b.onclick !== "function").length;
+    if(n) dead.push(sel + " — " + n + " of " + els.length + " dead");
+  }
+  console.log("every control is wired      :", dead.length === 0 && checked.length >= 6
+    ? "yes (" + checked.length + " kinds, " + wired.length + " sought)"
+    : "FAIL — " + (dead.join("; ") || "only " + checked.length + " kinds reachable: " + checked));
+
+  /* 11a. THE WAITING COUNTER MUST COME BACK DOWN. `stageState` decremented `waiting` only on
+          `assess`, but in bed-first and stream a chair-seated patient is emitted as `second`
+          straight from the queue with no `assess` — so every one of them stayed in the waiting
+          pool for the rest of the run. The stage drew a queue of people beside EMPTY CHAIRS, on
+          the two layouts Blake is being asked to judge, while the hero card on the same screen
+          read "still waiting when it closes: 0.0". Nothing checked the counter at all.
+          The invariant is exact: waiting = arrived - diverted - everyone who has taken a space. */
+  const waitBad = [];
+  for(const md of ["split","pooled","bedfirst","stream"]){
+    for(const fd of [false, true]){
+      S.mode=md; S.A=4; S.R=6; S.fastDischarge=fd; run(); buildTrace();
+      const seen = new Set();
+      let arrived=0, diverted=0;
+      let i = 0;
+      for(let t=0; t<=S.len*60+120 && waitBad.length===0; t++){
+        while(i < PLAY.trace.length && PLAY.trace[i].t <= t){
+          const e = PLAY.trace[i++];
+          if(e.ev==="arrive") arrived++;
+          else if(e.ev==="divert") diverted++;
+          else if(e.ev==="assess" || e.ev==="second") seen.add(e.id);
+        }
+        const want = arrived - diverted - seen.size;
+        const got = stageState(t).waiting;
+        if(got !== want) waitBad.push(md+(fd?" fd":"")+" t="+t+": shows "+got+", truly "+want);
+      }
+    }
+  }
+  console.log("the waiting pool empties    :", waitBad.length === 0
+    ? "yes (4 layouts x fastDischarge, every minute to close+2h)"
+    : "FAIL — " + waitBad.slice(0,3).join("; "));
+
+  /* 11b. AND IT SURVIVES ONE THAT DOES NOT FIT. The check above starts at 10, which every layout
+          can hold, so it passed while a bigger lane was being silently truncated: the shipped
+          "8 rooms + 10 chairs" preset lost 4 spaces and 4 points of score on ONE click into
+          pooled, irreversibly. Estates are swept up to the largest a divided lane can express. */
+  const bigGaps = [];
+  for(const [a0, r0] of [[8,10],[14,16],[12,12],[10,6]]){
+    for(const want of ["pooled","bedfirst","stream","split"]){
+      S.mode="split"; S.A=a0; S.R=r0; drawModes();
+      const before = S.A + S.R;
+      const btn = document.getElementById("modes").querySelectorAll("[data-m]").find(b=>b.dataset.m===want);
+      if(!btn || !btn.onclick){ bigGaps.push(a0+"+"+r0+"->"+want+" NO HANDLER"); continue }
+      btn.onclick();
+      const after = S.A + (modeOf().hasR ? S.R : 0);
+      if(after !== before) bigGaps.push(a0+"+"+r0+" -> "+want+" = "+after);
+    }
+  }
+  console.log("a big estate survives too   :", bigGaps.length === 0
+    ? "yes (8+10, 14+16, 12+12, 10+6 through every layout)"
+    : "FAIL — " + bigGaps.join("; "));
+
+  /* 11c. A LINK MUST NOT GROW THE LANE. run() rewrites the hash on every recompute, so a pooled
+          lane put R=0 in the address bar without anyone sharing anything — and LIM.R floored at 1,
+          so a reload clamped it UP. Click any divided layout after that and you were comparing 11
+          spaces against everyone else's 10. Round-trips every layout at its own sizes. */
+  const grew = [];
+  for(const [md, a0, r0] of [["pooled",10,0],["pooled",30,0],["split",6,4],["bedfirst",4,6],["stream",5,5]]){
+    S.mode=md; S.A=a0; S.R=r0;
+    const est = S.A + (modeOf().hasR ? S.R : 0);
+    location.hash = hashState();
+    fromHash();
+    const back = S.A + (modeOf().hasR ? S.R : 0);
+    if(back !== est) grew.push(md+" "+a0+"+"+r0+": "+est+" -> "+back);
+    for(const want of ["split","bedfirst","stream"]){          // and it must not grow on the way out
+      const keep = {m:S.mode, a:S.A, r:S.R};
+      const btn = document.getElementById("modes").querySelectorAll("[data-m]").find(b=>b.dataset.m===want);
+      if(btn && btn.onclick){ btn.onclick();
+        const t2 = S.A + (modeOf().hasR ? S.R : 0);
+        if(t2 !== est) grew.push(md+" "+a0+"+"+r0+" -> "+want+": "+est+" -> "+t2);
+      }
+      S.mode=keep.m; S.A=keep.a; S.R=keep.r; drawModes();
+    }
+  }
+  console.log("a link never grows the lane :", grew.length === 0
+    ? "yes (5 lanes, reload then every layout)" : "FAIL — " + grew.join("; "));
+
   console.log("the estate survives a switch :", sizes.every(v => v === 10)
     ? "yes (10 spaces through all four layouts)"
     : "FAIL — clicking through gave " + sizes.join(", "));
