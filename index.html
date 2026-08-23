@@ -558,8 +558,8 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
         <li><b>Two assumptions, and both are controls rather than constants.</b> The first is
             <b>how long a patient keeps the assessment space before moving on</b> — the slider under
             Timing. Nothing measures it: what we can measure is that a test patient's <b>first
-            order lands 47 minutes</b> after rooming. The 72-minute reference this page also
-            quotes is that 47 plus an <b>assumed 25 minutes</b> after the order &mdash; nothing
+            order lands 37 minutes</b> after rooming. The 62-minute reference this page also
+            quotes is that 37 plus an <b>assumed 25 minutes</b> after the order &mdash; nothing
             timestamps when a patient could actually move, so that 25 was chosen, not measured.
             Neither number is a decision anyone made, and neither exists at all for the half who
             need no test. It is the number that decides the best split, so move it and watch the
@@ -669,10 +669,11 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
           is still there to tick if the group wants it back on other grounds.</p>
 
         <div class="eyebrow">An interpreter is now measured, not guessed</div>
-        <p><b>11.4% of this lane needs an interpreter</b> &mdash; preferred language is
-          recorded at registration, not judged at the bedside, so this is a count rather than an
-          estimate: <b>99.7%</b> of the window carries it, across <b>18</b>
-          languages. An interpreted evaluation has to be audible and private, and an interpreter
+        <p><b>11.4% of this lane records a preferred language other than English</b> &mdash; taken
+          at registration, not judged at the bedside, and present for <b>99.7%</b> of the
+          window across <b>18</b> languages. Reading that as needing an interpreter is a
+          judgement, not a count &mdash; but it is a recorded field rather than a guess, which is
+          what separates it from the share below. An interpreted evaluation has to be audible and private, and an interpreter
           is often placed physically at the bedside; a chair in an open bay is neither.</p>
         <p>It is ticked above as its own criterion, and it is <b>not</b> a flat percentage. Each
           complaint carries its own measured rate &mdash; from <b>4.2%</b> to
@@ -718,7 +719,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       the same engine that produced the figures in the scoping deck.</footer>
 </div><!-- /wrap -->
 <script>
-const D = {"pom": 25, "cut": "2026-08-12", "day_mean": 54.6, "lam": [2.8947, 3.1851, 3.455, 3.5823, 3.8574, 3.8489, 3.3786, 2.5976], "lam24": [1.4618, 1.0153, 0.781, 0.691, 0.6757, 0.5484, 0.7216, 1.1205, 1.5942, 2.4092, 2.8149, 3.2003, 3.0238, 2.8981, 2.8353, 2.8981, 3.1885, 3.4601, 3.584, 3.8625, 3.8591, 3.3837, 2.5976, 1.9745], "day": {"10": 38, "25": 46, "50": 54, "75": 63, "90": 72, "95": 78}, "eve": [8, 8, 10, 11, 11, 11, 11, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 38, 38, 38, 38, 38, 38, 39, 39, 39, 39, 39, 40, 40, 40, 41, 41, 42, 42, 42, 42, 42, 42, 42, 42, 43, 43, 43, 44, 44, 45, 45, 46, 46, 47, 48], "eve_n": 589, "eve_p": {"10": 18, "25": 22, "50": 26, "75": 31, "90": 36, "95": 38}, "shr": 0.498105, "now": [1, 13, 17, 18, 19, 20, 21, 22, 23, 24, 24, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 33, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 38, 38, 38, 39, 39, 40, 40, 40, 41, 41, 41, 42, 42, 42, 43, 43, 44, 44, 44, 45, 45, 45, 46, 46, 46, 47, 47, 47, 48, 48, 48, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 53, 53, 53, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 60, 60, 60, 61, 61, 62, 62, 62, 63, 63, 63, 64, 64, 65, 65, 65, 66, 66, 67, 67, 68, 68, 69, 69, 70, 70, 70, 71, 71, 72, 72, 73, 73, 74, 74, 74, 75, 75, 76, 76, 77, 77, 78, 78, 78, 79, 79, 80, 80, 81, 81, 82, 82, 83, 83, 84, 85, 85, 86, 86, 87, 87, 88, 88, 89, 89, 90, 90, 91, 91, 92, 92, 93, 93, 94, 95, 95, 96, 96, 97, 98, 98, 99, 100, 100, 101, 101, 102, 103, 104, 104, 105, 106, 107, 107, 108, 109, 110, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 132, 133, 134, 135, 136, 138, 139, 140, 142, 143, 145, 146, 148, 149, 151, 153, 155, 157, 159, 161, 163, 166, 169, 171, 174, 178, 181, 186, 189, 194, 201, 207, 214, 225, 240, 261, 304, 1529], "asw": [25, 25, 25, 25, 26, 26, 26, 27, 27, 27, 28, 28, 28, 28, 29, 29, 30, 30, 30, 31, 31, 31, 32, 32, 32, 33, 33, 33, 33, 34, 34, 34, 34, 35, 35, 35, 36, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 40, 40, 41, 41, 41, 41, 41, 42, 42, 42, 42, 43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 45, 45, 45, 45, 46, 46, 46, 46, 47, 47, 47, 47, 47, 48, 48, 48, 48, 49, 49, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 52, 52, 53, 53, 53, 54, 54, 54, 54, 55, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 59, 60, 60, 60, 61, 61, 61, 62, 62, 62, 63, 63, 63, 64, 64, 64, 65, 65, 65, 66, 66, 67, 67, 68, 68, 68, 69, 69, 69, 70, 70, 71, 71, 72, 72, 72, 73, 73, 74, 74, 75, 75, 76, 76, 77, 77, 78, 78, 79, 79, 80, 80, 81, 81, 82, 83, 83, 84, 84, 85, 86, 86, 87, 87, 88, 89, 89, 90, 91, 91, 92, 93, 93, 94, 95, 95, 96, 97, 98, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 112, 112, 113, 115, 116, 117, 118, 119, 121, 122, 124, 126, 127, 128, 130, 131, 133, 135, 138, 141, 143, 146, 149, 151, 154, 158, 162, 168, 174, 180, 189, 204, 227, 441], "res": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 9, 10, 11, 11, 12, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 18, 19, 20, 20, 21, 22, 22, 23, 23, 24, 25, 25, 26, 27, 27, 28, 29, 29, 30, 31, 31, 32, 33, 33, 34, 35, 35, 36, 36, 37, 38, 38, 39, 39, 40, 40, 41, 42, 42, 43, 43, 44, 45, 45, 46, 46, 47, 47, 48, 49, 49, 50, 51, 51, 52, 52, 53, 53, 54, 54, 55, 55, 56, 57, 58, 58, 59, 59, 60, 60, 61, 62, 62, 63, 64, 64, 65, 65, 66, 67, 67, 68, 69, 70, 71, 71, 72, 73, 73, 74, 75, 76, 76, 77, 78, 78, 79, 80, 81, 81, 82, 83, 84, 84, 85, 86, 87, 88, 89, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 113, 114, 116, 117, 118, 120, 121, 122, 123, 125, 126, 127, 129, 130, 131, 132, 135, 137, 138, 140, 142, 144, 145, 147, 149, 151, 154, 156, 158, 161, 163, 167, 170, 172, 175, 178, 181, 185, 189, 192, 196, 200, 204, 208, 213, 218, 224, 232, 240, 248, 256, 267, 276, 288, 302, 319, 339, 372, 424, 516, 4566], "mean_now": 83.0, "mean_asw": 69.0, "mean_res": 79.3, "T_A": 76.04, "T_R": 78.19, "g": {"shr": 0.5035, "asw": 71.7, "res": 77.2, "now": 85.8, "rd": 20.0, "dd": 41.9, "interp": 0.114, "interp_cov": 0.9973}, "hold_all": 111.6, "floor": 8.0, "main24": [98.7, 89.9, 65, 47.0, 35.7, 23.2, 18.7, 15.6, 16.3, 23.6, 25.8, 27.2, 33.8, 38.6, 39.2, 31.6, 38.1, 41.2, 46.5, 53.8, 67.4, 85.6, 107.0, 109.3], "main_mean": 50.0, "nolane24": [100.8, 89.9, 65.0, 47.1, 35.7, 23.2, 18.0, 15.3, 15.3, 17.4, 18.5, 28.0, 34.0, 38.6, 39.2, 31.4, 38.8, 44.6, 52.2, 70.0, 93.6, 115.8, 117.8, 113.6], "nolane_mean": 59.2, "cc": [{"n": "Fever", "s": 0.16679, "x": 0.1658, "w": 0.665, "a": 76.1, "r": 67.2, "o": 86.8, "dd": 35.1, "me": 0}, {"n": "Cough", "s": 0.08523, "x": 0.1075, "w": 0.62, "a": 71.5, "r": 60.9, "o": 79.2, "dd": 33.2, "me": 0}, {"n": "Rash", "s": 0.05193, "x": 0.16, "w": 0.192, "a": 84.4, "r": 44.9, "o": 75.6, "dd": 30.3, "me": 0}, {"n": "Vomiting", "s": 0.0518, "x": 0.1443, "w": 0.518, "a": 77.5, "r": 95.8, "o": 96.5, "dd": 52.2, "me": 0}, {"n": "Ear Problem", "s": 0.04939, "x": 0.1223, "w": 0.101, "a": 73.5, "r": 77.6, "o": 69.1, "dd": 28.5, "me": 0}, {"n": "Fall", "s": 0.03761, "x": 0.0745, "w": 0.306, "a": 65.9, "r": 99.2, "o": 92.8, "dd": 54.2, "me": 0}, {"n": "Head Injury", "s": 0.03641, "x": 0.0539, "w": 0.132, "a": 70.7, "r": 115.7, "o": 91, "dd": 46.6, "me": 0}, {"n": "URI", "s": 0.03305, "x": 0.1111, "w": 0.597, "a": 73.3, "r": 54.1, "o": 86.2, "dd": 38.9, "me": 0}, {"n": "Laceration", "s": 0.02748, "x": 0.0486, "w": 0.116, "a": 63.8, "r": 109.5, "o": 115.0, "dd": 70.6, "me": 0}, {"n": "Abdominal Pain", "s": 0.01969, "x": 0.1581, "w": 0.749, "a": 64.8, "r": 121.2, "o": 105.4, "dd": 53.3, "me": 0}, {"n": "Breathing Difficulty", "s": 0.01925, "x": 0.0662, "w": 0.507, "a": 79.3, "r": 78.6, "o": 98.5, "dd": 46.2, "me": 0}, {"n": "Eye Problem", "s": 0.019, "x": 0.1717, "w": 0.092, "a": 83.1, "r": 74.9, "o": 81.3, "dd": 39.8, "me": 0}, {"n": "Arm Injury", "s": 0.01779, "x": 0.0679, "w": 0.757, "a": 51.6, "r": 76.2, "o": 50.0, "dd": 20.7, "me": 0}, {"n": "Finger Injury", "s": 0.0171, "x": 0.1074, "w": 0.83, "a": 53.0, "r": 78.2, "o": 97.2, "dd": 45.1, "me": 0}, {"n": "Throat Pain", "s": 0.01665, "x": 0.1369, "w": 0.762, "a": 64.9, "r": 46.7, "o": 81.6, "dd": 37.6, "me": 0}, {"n": "Skin Problem", "s": 0.01444, "x": 0.1106, "w": 0.231, "a": 91.1, "r": 86.0, "o": 87.5, "dd": 34.8, "me": 0}, {"n": "Diarrhea", "s": 0.01292, "x": 0.2414, "w": 0.469, "a": 77.1, "r": 85.0, "o": 83.7, "dd": 41.5, "me": 0}, {"n": "Ankle Injury", "s": 0.0126, "x": 0.0653, "w": 0.99, "a": 39.2, "r": 90.4, "o": 85.8, "dd": 41.9, "me": 1}, {"n": "Well Child", "s": 0.01209, "x": 0.0419, "w": 0.373, "a": 77.1, "r": 163.2, "o": 83.8, "dd": 42.1, "me": 0}, {"n": "Headache", "s": 0.01083, "x": 0.1287, "w": 0.555, "a": 89.8, "r": 72.0, "o": 105.5, "dd": 61.6, "me": 0}, {"n": "Dysuria", "s": 0.01057, "x": 0.0539, "w": 0.981, "a": 50.1, "r": 86.7, "o": 85.8, "dd": 41.9, "me": 1}, {"n": "Constipation", "s": 0.00963, "x": 0.1842, "w": 0.421, "a": 72.9, "r": 111.1, "o": 116.9, "dd": 73.4, "me": 0}, {"n": "Foot Injury", "s": 0.00887, "x": 0.0857, "w": 0.877, "a": 49.8, "r": 79.7, "o": 99.8, "dd": 41.9, "me": 1}, {"n": "Musculoskeletal Problem", "s": 0.00855, "x": 0.0963, "w": 0.876, "a": 61.7, "r": 90.9, "o": 73.3, "dd": 41.9, "me": 1}, {"n": "Genital & sensitive exam (18)", "s": 0.00868, "x": 0.1022, "w": 0.524, "a": 80.2, "r": 84.6, "o": 76.6, "dd": 29.9, "me": 0, "k": "genital"}, {"n": "Everything else (209 complaints)", "s": 0.24164, "x": 0.0844, "w": 0.521, "a": 68.4, "r": 87.4, "o": 83.9, "dd": 41.3, "me": 0}], "grp": {"p2": 0.02329, "p3": 0.00293, "p4": 0.00059, "mean_group_size": 1.03092, "cut": "ESI 4/5, 15-22h, from 2025-01-01", "share": 0.0561}, "prose": {"toorder": 47, "refasw": 72, "pom": 25, "main15": 32, "main22": 107, "mean1523": 58.1, "mainmean": 50.0, "floor": 8.0, "cut": "2026-08-12", "genn": 18, "genpct": 0.87, "urinn": 205, "urinpct": 1.3, "intp": 11.4, "intplo": 4.2, "intphi": 24.1, "intpcov": 99.7, "intpn": 18, "grppct": 2.68, "grpshare": 5.61, "ftspan": "11:00\u201320:00", "peakspan": "19:00\u201320:00", "worstspan": "22:00\u201323:00", "podlo": 66, "podhi": 69, "poduntil": 18, "podwlo": 27, "podwhi": 45, "otherlo": 28, "otherhi": 118, "walkoutpct": 59}};
+const D = {"pom": 25, "cut": "2026-08-12", "day_mean": 54.6, "lam": [2.8947, 3.1851, 3.455, 3.5823, 3.8574, 3.8489, 3.3786, 2.5976], "lam24": [1.4618, 1.0153, 0.781, 0.691, 0.6757, 0.5484, 0.7216, 1.1205, 1.5942, 2.4092, 2.8149, 3.2003, 3.0238, 2.8981, 2.8353, 2.8981, 3.1885, 3.4601, 3.584, 3.8625, 3.8591, 3.3837, 2.5976, 1.9745], "day": {"10": 38, "25": 46, "50": 54, "75": 63, "90": 72, "95": 78}, "eve": [8, 8, 10, 11, 11, 11, 11, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 38, 38, 38, 38, 38, 38, 39, 39, 39, 39, 39, 40, 40, 40, 41, 41, 42, 42, 42, 42, 42, 42, 42, 42, 43, 43, 43, 44, 44, 45, 45, 46, 46, 47, 48], "eve_n": 589, "eve_p": {"10": 18, "25": 22, "50": 26, "75": 31, "90": 36, "95": 38}, "shr": 0.498105, "now": [1, 13, 17, 18, 19, 20, 21, 22, 23, 24, 24, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 33, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 38, 38, 38, 39, 39, 40, 40, 40, 41, 41, 41, 42, 42, 42, 43, 43, 44, 44, 44, 45, 45, 45, 46, 46, 46, 47, 47, 47, 48, 48, 48, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 53, 53, 53, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 60, 60, 60, 61, 61, 62, 62, 62, 63, 63, 63, 64, 64, 65, 65, 65, 66, 66, 67, 67, 68, 68, 69, 69, 70, 70, 70, 71, 71, 72, 72, 73, 73, 74, 74, 74, 75, 75, 76, 76, 77, 77, 78, 78, 78, 79, 79, 80, 80, 81, 81, 82, 82, 83, 83, 84, 85, 85, 86, 86, 87, 87, 88, 88, 89, 89, 90, 90, 91, 91, 92, 92, 93, 93, 94, 95, 95, 96, 96, 97, 98, 98, 99, 100, 100, 101, 101, 102, 103, 104, 104, 105, 106, 107, 107, 108, 109, 110, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 132, 133, 134, 135, 136, 138, 139, 140, 142, 143, 145, 146, 148, 149, 151, 153, 155, 157, 159, 161, 163, 166, 169, 171, 174, 178, 181, 186, 189, 194, 201, 207, 214, 225, 240, 261, 304, 1529], "asw": [25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0, 26, 26, 26, 27, 27, 28, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 33, 34, 34, 34, 35, 35, 35, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 41, 41, 41, 41, 42, 42, 42, 42, 43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45, 46, 46, 46, 47, 47, 47, 47, 48, 48, 48, 49, 49, 49, 50, 50, 50, 50, 51, 51, 51, 52, 52, 52, 53, 53, 54, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 59, 59, 59, 60, 60, 61, 61, 61, 62, 62, 63, 63, 63, 64, 64, 65, 65, 66, 66, 67, 67, 68, 68, 68, 69, 69, 70, 71, 71, 72, 72, 73, 73, 74, 74, 75, 75, 76, 77, 77, 78, 79, 79, 80, 80, 81, 82, 82, 83, 84, 84, 85, 86, 87, 88, 88, 89, 90, 91, 91, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 103, 104, 105, 106, 107, 109, 110, 112, 112, 114, 115, 116, 118, 119, 121, 123, 125, 127, 128, 130, 132, 134, 137, 141, 143, 147, 150, 153, 156, 162, 169, 175, 184, 198, 220, 441], "res": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2, 2, 3.0, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 10, 10, 11, 12, 12.0, 13, 13.0, 14.0, 15, 15, 16, 17.0, 17.0, 18, 18, 19, 20, 20, 21, 21, 22.0, 23, 23.0, 24, 25, 25.0, 26, 27.0, 27.0, 28, 29.0, 29, 30.0, 30.0, 31, 32, 32, 33, 34, 34.0, 35, 35, 36, 36, 37, 38, 38, 39.0, 39.0, 40, 40.0, 41, 41.0, 42.0, 43, 43.0, 44, 44, 45, 46, 46, 47.0, 47, 48, 48, 49.0, 50.0, 50.0, 51.0, 51, 52, 52, 53, 53, 54, 54, 55.0, 55, 56, 57, 57, 58, 58, 59, 60, 60, 61, 61, 62, 63, 63.0, 64, 65, 65, 66, 66, 67, 67, 68.0, 69, 70, 70, 71, 72, 73, 73, 74, 74, 75, 76, 76, 77.0, 78, 79, 79, 80, 81, 82, 82, 83, 84, 85, 85, 86.0, 87.0, 88.0, 89, 89.0, 90, 91.0, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 102, 102, 103, 104, 105, 106, 107, 108.0, 109, 110, 111, 113, 114, 115, 116, 118.0, 119, 120, 121, 123, 124, 125, 127, 128, 129.0, 130, 132.0, 133.0, 135.0, 137, 139, 140, 142, 144, 146.0, 147, 149, 151.0, 154, 156.0, 158.0, 161, 163, 167, 170, 172, 175, 178, 181, 184, 189.0, 192, 196, 201, 205, 209, 214, 220, 227.0, 235, 243, 251, 262, 272.0, 284, 298, 315, 335, 365.0, 414, 507, 4566], "mean_now": 83.0, "mean_asw": 61.8, "mean_res": 79.8, "T_A": 72.43, "T_R": 78.68, "g": {"shr": 0.5035, "asw": 62.0, "res": 78.3, "now": 85.8, "rd": 20.0, "dd": 41.3, "ddall": 66.5, "interp": 0.114, "interp_cov": 0.9973}, "hold_all": 111.6, "floor": 8.0, "main24": [98.7, 89.9, 65, 47.0, 35.7, 23.2, 18.7, 15.6, 16.3, 23.6, 25.8, 27.2, 33.8, 38.6, 39.2, 31.6, 38.1, 41.2, 46.5, 53.8, 67.4, 85.6, 107.0, 109.3], "main_mean": 50.0, "nolane24": [100.8, 89.9, 65.0, 47.1, 35.7, 23.2, 18.0, 15.3, 15.3, 17.4, 18.5, 28.0, 34.0, 38.6, 39.2, 31.4, 38.8, 44.6, 52.2, 70.0, 93.6, 115.8, 117.8, 113.6], "nolane_mean": 59.2, "cc": [{"n": "Fever", "s": 0.16679, "x": 0.1658, "w": 0.665, "a": 73.7, "r": 69.4, "o": 86.8, "dd": 35.1, "me": 0, "ddall": 70.2}, {"n": "Cough", "s": 0.08523, "x": 0.1075, "w": 0.62, "a": 68.8, "r": 60.8, "o": 79.2, "dd": 33.2, "me": 0, "ddall": 63.2}, {"n": "Rash", "s": 0.05193, "x": 0.16, "w": 0.192, "a": 82.3, "r": 45.9, "o": 75.6, "dd": 30.3, "me": 0, "ddall": 35.5}, {"n": "Vomiting", "s": 0.0518, "x": 0.1443, "w": 0.518, "a": 71.8, "r": 100.5, "o": 96.5, "dd": 52.2, "me": 0, "ddall": 82.8}, {"n": "Ear Problem", "s": 0.04939, "x": 0.1223, "w": 0.101, "a": 73.2, "r": 75.0, "o": 69.1, "dd": 28.5, "me": 0, "ddall": 33.6}, {"n": "Fall", "s": 0.03761, "x": 0.0745, "w": 0.306, "a": 54.0, "r": 91.6, "o": 92.8, "dd": 54.2, "me": 0, "ddall": 67.8}, {"n": "Head Injury", "s": 0.03641, "x": 0.0539, "w": 0.132, "a": 70.6, "r": 111.4, "o": 91, "dd": 46.6, "me": 0, "ddall": 60.4}, {"n": "URI", "s": 0.03305, "x": 0.1111, "w": 0.597, "a": 72.2, "r": 55.0, "o": 86.2, "dd": 38.9, "me": 0, "ddall": 62.5}, {"n": "Laceration", "s": 0.02748, "x": 0.0486, "w": 0.116, "a": 58.2, "r": 109.2, "o": 115.0, "dd": 70.6, "me": 0, "ddall": 75.7}, {"n": "Abdominal Pain", "s": 0.01969, "x": 0.1581, "w": 0.749, "a": 60.1, "r": 125.6, "o": 105.4, "dd": 53.3, "me": 0, "ddall": 122.3}, {"n": "Breathing Difficulty", "s": 0.01925, "x": 0.0662, "w": 0.507, "a": 77.3, "r": 76.1, "o": 98.5, "dd": 46.2, "me": 0, "ddall": 71.8}, {"n": "Eye Problem", "s": 0.019, "x": 0.1717, "w": 0.092, "a": 80.8, "r": 73.2, "o": 81.3, "dd": 39.8, "me": 0, "ddall": 45.6}, {"n": "Arm Injury", "s": 0.01779, "x": 0.0679, "w": 0.757, "a": 37.6, "r": 72.9, "o": 50.0, "dd": 20.7, "me": 0, "ddall": 63.1}, {"n": "Finger Injury", "s": 0.0171, "x": 0.1074, "w": 0.83, "a": 35.0, "r": 76.4, "o": 97.2, "dd": 45.1, "me": 0, "ddall": 64.5}, {"n": "Throat Pain", "s": 0.01665, "x": 0.1369, "w": 0.762, "a": 61.4, "r": 47.0, "o": 81.6, "dd": 37.6, "me": 0, "ddall": 63.2}, {"n": "Skin Problem", "s": 0.01444, "x": 0.1106, "w": 0.231, "a": 92.7, "r": 81.2, "o": 87.5, "dd": 34.8, "me": 0, "ddall": 50.6}, {"n": "Diarrhea", "s": 0.01292, "x": 0.2414, "w": 0.469, "a": 74.8, "r": 87.7, "o": 83.7, "dd": 41.5, "me": 0, "ddall": 70.9}, {"n": "Ankle Injury", "s": 0.0126, "x": 0.0653, "w": 0.99, "a": 29.4, "r": 84.8, "o": 85.8, "dd": 41.3, "me": 1, "ddall": 74.1}, {"n": "Well Child", "s": 0.01209, "x": 0.0419, "w": 0.373, "a": 71.1, "r": 154.3, "o": 83.8, "dd": 42.1, "me": 0, "ddall": 83.0}, {"n": "Headache", "s": 0.01083, "x": 0.1287, "w": 0.555, "a": 86.9, "r": 77.4, "o": 105.5, "dd": 61.6, "me": 0, "ddall": 91.7}, {"n": "Dysuria", "s": 0.01057, "x": 0.0539, "w": 0.981, "a": 36.4, "r": 82.4, "o": 85.8, "dd": 41.3, "me": 1, "ddall": 83.8}, {"n": "Constipation", "s": 0.00963, "x": 0.1842, "w": 0.421, "a": 66.6, "r": 109.3, "o": 116.9, "dd": 73.4, "me": 0, "ddall": 101.3}, {"n": "Foot Injury", "s": 0.00887, "x": 0.0857, "w": 0.877, "a": 34.1, "r": 84.0, "o": 99.8, "dd": 41.3, "me": 1, "ddall": 69.5}, {"n": "Musculoskeletal Problem", "s": 0.00855, "x": 0.0963, "w": 0.876, "a": 46.8, "r": 90.2, "o": 73.3, "dd": 41.3, "me": 1, "ddall": 78.2}, {"n": "Genital & sensitive exam (18)", "s": 0.00868, "x": 0.1022, "w": 0.524, "a": 66.6, "r": 84.9, "o": 76.6, "dd": 29.9, "me": 0, "ddall": 64.1, "k": "genital"}, {"n": "Everything else (209 complaints)", "s": 0.24164, "x": 0.0844, "w": 0.521, "a": 53.1, "r": 84.2, "o": 83.9, "dd": 41.3, "me": 0, "ddall": 68.2}], "grp": {"p2": 0.02329, "p3": 0.00293, "p4": 0.00059, "mean_group_size": 1.03092, "cut": "ESI 4/5, 15-22h, from 2025-01-01", "share": 0.0561}, "prose": {"toorder": 37, "refasw": 62, "pom": 25, "main15": 32, "main22": 107, "mean1523": 58.1, "mainmean": 50.0, "floor": 8.0, "cut": "2026-08-12", "genn": 18, "genpct": 0.87, "urinn": 205, "urinpct": 1.3, "intp": 11.4, "intplo": 4.2, "intphi": 24.1, "intpcov": 99.7, "intpn": 18, "grppct": 2.68, "grpshare": 5.61, "ftspan": "11:00\u201320:00", "peakspan": "19:00\u201320:00", "worstspan": "22:00\u201323:00", "podlo": 66, "podhi": 69, "poduntil": 18, "podwlo": 27, "podwhi": 45, "otherlo": 28, "otherhi": 118, "walkoutpct": 59}};
 
 /* ── engine: a port of tandem()/pooled() from the deck builder ───────────── */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -847,6 +848,15 @@ function sim(cfg){
          engine is exactly as it was. */
       const releaseA = (t,tag) => ev.push([t+turnA,3,tag]);
       const releaseB = (t,tag) => ev.push([t+turnB,4,tag]);
+      /* ⚠ THE POOL HAS TO TRAVEL WITH THE EVENT. In a divided lane a patient who moves produces
+         TWO releases — the assessment space `turnA` later, and the second-area space when they
+         finally leave — with the same id. The stage resolved the pool by looking up where the
+         patient IS, which by then is the second area, so the first release blanked the chair they
+         were still sitting in and deleted them from the map, making the real departure a no-op.
+         On the shipped defaults that drew the second area short for 362 of 480 minutes, and all
+         four chairs empty while all four were occupied. The page promises the opposite in two
+         places: a space that looks full IS full. */
+      const freeEv = (t,tag,pool) => { if(T) T.push({t, id:tag, ev:"free", pool}) };
       /* ⚠ the ANIMATION has to see the release too. It used to free the slot on "leave", so a
          space the engine was still holding for turnover showed as empty next to a queue — the
          page claims a space that looks full IS full, and for 296 of 481 minutes on a tight lane
@@ -904,13 +914,23 @@ function sim(cfg){
          bit-identical to a pooled lane over the same spaces. Expect stream to score worse than
          bed-first at the same footprint. That IS the measurement — a department may stream because
          of how nursing is assigned, and this prices it. */
-      const seatBedParty = (t, idx) => { for(let j=idx.length-1;j>=0;j--){
-          const q=qa.splice(idx[j],1)[0]; rec(q[1], t-q[0]);
-          /* ⚠ ROOMS FIRST FOR EVERYONE in bed-first — that is what the layout IS. This read
-             `ab<A && (bedReq || rb>=R)`, which sends a chair-eligible patient to a bed only once
-             every chair is full: the preference inverted, and the mode's own title, stage label
-             and hint all promised the opposite. It made Blake's rule look cheaper than it is —
-             at 2 rooms + 8 chairs, 15.6 min/patient against a true 22.3. */
+      /* ⚠ ROOMS FIRST FOR EVERYONE in bed-first — that is what the layout IS. It once read
+         `ab<A && (bedReq || rb>=R)`, sending a chair-eligible patient to a room only once every
+         chair was full: the preference inverted, against the mode's own title, stage label and
+         hint. It made Blake's rule look cheaper than it is — at 2 rooms + 8 chairs, 15.6
+         min/patient against a true 22.3.
+
+         ⚠ AND ROOMS GO TO THE PATIENTS WHO NEED THEM FIRST. Walking the party in queue order
+         handed a room to whoever it reached while one was free, so in a MIXED party a
+         chair-eligible sibling could take the last room and push the room-required one into a
+         chair — the exact rule the layout exists to model. 1.16% of room-required placements on a
+         room-poor lane with the sibling rule off; unreachable with it on, and impossible in
+         stream, but it is a user-facing toggle. */
+      const seatBedParty = (t, idx) => {
+        const rows = idx.map(j => qa[j]);
+        rows.sort((x, y) => (bedReq[y[1]] ? 1 : 0) - (bedReq[x[1]] ? 1 : 0));
+        for(let j=idx.length-1;j>=0;j--) qa.splice(idx[j], 1);
+        for(const q of rows){ rec(q[1], t-q[0]);
           const toBed = stream ? bedReq[q[1]] : (ab < A);
           if(toBed) startBed(t,q[1]); else startChair(t,q[1]) } };
       const takeParty = t => {
@@ -951,8 +971,8 @@ function sim(cfg){
                  if(T) T.push({t, id:tag, ev:"leave"});
                  if(kind===1) releaseA(t,tag); else releaseB(t,tag) }
           else { // the space is turned over and usable again
-                 if(kind===3){ ab--; if(T){ freeA.push(slotA[tag]); T.push({t, id:tag, ev:"free"}) } }
-                 else        { rb--; if(T){ freeB.push(slotB[tag]); T.push({t, id:tag, ev:"free"}) } }
+                 if(kind===3){ ab--; if(T){ freeA.push(slotA[tag]); freeEv(t,tag,"A") } }
+                 else        { rb--; if(T){ freeB.push(slotB[tag]); freeEv(t,tag,"B") } }
                  drain(t) }
           if(ab+rb > peak) peak = ab+rb;
           if(ab > pkA) pkA = ab;
@@ -976,10 +996,10 @@ function sim(cfg){
           if(T) T.push({t, id:tag, ev:"leave"});
           releaseB(t,tag);
         } else if(kind===3){                                        // assessment space turned over
-          ab--; if(T){ freeA.push(slotA[tag]); T.push({t, id:tag, ev:"free"}) }
+          ab--; if(T){ freeA.push(slotA[tag]); freeEv(t,tag,"A") }
           takeNext(t);
         } else {                                                    // second-area space turned over
-          rb--; if(T){ freeB.push(slotB[tag]); T.push({t, id:tag, ev:"free"}) }
+          rb--; if(T){ freeB.push(slotB[tag]); freeEv(t,tag,"B") }
           if(qr.length){ const q=qr.shift(); wr += t-q[0]; wrN++;
                          startB(t,q[1]); releaseA(t,q[1]) }
           else takeNext(t);
@@ -1057,12 +1077,15 @@ function buildTrace(){
 function stageState(t){
   const A = new Array(PLAY.A).fill(null), B = new Array(PLAY.R).fill(null);
   const where = new Map(), test = new Map();
-  let waiting = 0, gone = 0, sent = 0, stuck = new Set();
+  let waiting = 0, gone = 0, sent = 0, stuck = new Set(), turning = new Map();
   for(const e of PLAY.trace){
     if(e.t > t) break;
     if(e.ev === "arrive"){ waiting++; test.set(e.id, e.test) }
     else if(e.ev === "assess"){ waiting--; A[e.slot] = e.id; where.set(e.id, ["A", e.slot]); stuck.delete(e.id) }
-    else if(e.ev === "second"){ const w = where.get(e.id); if(w && w[0]==="A") A[w[1]] = null;
+    else if(e.ev === "second"){ const w = where.get(e.id);
+                                /* the assessment space is not free yet — it is being turned over,
+                                   exactly as it is after a departure */
+                                if(w && w[0]==="A"){ A[w[1]] = "turn"; turning.set(e.id, w[1]) }
                                 B[e.slot] = e.id; where.set(e.id, ["B", e.slot]); stuck.delete(e.id) }
     else if(e.ev === "stuck"){ stuck.add(e.id) }
     else if(e.ev === "leave"){ const w = where.get(e.id);
@@ -1070,9 +1093,11 @@ function stageState(t){
                                   turned over, and the engine is still counting it occupied */
                                if(w) (w[0]==="A"?A:B)[w[1]] = "turn";
                                gone++ }
-    else if(e.ev === "free"){  const w = where.get(e.id);
-                               if(w) (w[0]==="A"?A:B)[w[1]] = null;
-                               where.delete(e.id) }
+    else if(e.ev === "free"){  if(e.pool === "A" && turning.has(e.id)){   // the space they left behind
+                                 A[turning.get(e.id)] = null; turning.delete(e.id); }
+                               else { const w = where.get(e.id);
+                                      if(w && (!e.pool || w[0] === e.pool)){ (w[0]==="A"?A:B)[w[1]] = null;
+                                                                             where.delete(e.id) } } }
     else if(e.ev === "divert"){ waiting--; sent++ }
   }
   return {A, B, waiting, gone, sent, stuck, test};
@@ -1122,7 +1147,7 @@ function paintSlots(host, ids, st){
    overflow chairs reads as the results area it is not. */
 function labelStage(m){
   const ah = $("stageAH"), bh = $("stageBH");
-  if(ah) ah.textContent = m.id==="bedfirst" ? "In a room" : m.id==="stream" ? "In a bed"
+  if(ah) ah.textContent = m.id==="bedfirst" || m.id==="stream" ? "In a room"
                         : m.id==="pooled" ? "In a space" : "Being assessed";
   if(bh) bh.textContent = m.id==="bedfirst" ? "In an overflow chair"
                         : m.id==="stream" ? "In a chair" : "Second area — results & discharge";
@@ -1312,7 +1337,8 @@ function evaluate(cfg, dayTotal){
   const hours = Array.from({length:cfg.len}, (_,i)=>(cfg.start+i)%24);
   const fac   = dayTotal / D.day_mean;
 
-  const keep = cfg.cc === undefined ? new Set(CC.map(x=>x.i))
+  const keep = cfg.cc === "-" ? new Set()
+             : cfg.cc === undefined ? new Set(CC.map(x=>x.i))
              : new Set(String(cfg.cc).split(".").filter(v=>v!=="").map(Number));
   const sel = CC.filter(x=>keep.has(x.i)), share = sel.reduce((a,x)=>a+x.s,0);
   const w = k => share ? sel.reduce((a,x)=>a+x.s*x[k],0)/share : 1;
@@ -1328,7 +1354,8 @@ function evaluate(cfg, dayTotal){
            // a row saved during the brief flat-share build carries one number and no list
            bedShare: cfg.bedcc === undefined && cfg.bedShare !== undefined
              ? Math.min(1, Math.max(0, (+cfg.bedShare || 0) / 100))
-             : bedShareOf(keep, cfg.bedcc === undefined ? new Set(BED_IDS) : idSet(cfg.bedcc),
+             : bedShareOf(keep, cfg.bedcc === "-" ? new Set()
+                                 : cfg.bedcc === undefined ? new Set(BED_IDS) : idSet(cfg.bedcc),
                           cfg.bedExtra, cfg.bedIntp),
            assessMin:cfg.assess, fastDischarge:cfg.fastDischarge, shr:w("w"), lam,
            /* Scaled by the mix, exactly as the service pools are. A lane that takes only quick
@@ -1380,7 +1407,7 @@ const MODES = [
                 s:"A room if one is free, a chair only when they are all taken — and some patients need a room either way. Nobody moves.",
                 hasR:true},
   {id:"stream",   t:"Two streams, kept apart",
-                s:"Sorted at the door: some patients go to beds, everyone else to chairs, and neither side lends to the other. Nobody moves.",
+                s:"Sorted at the door: some patients go to rooms, everyone else to chairs, and neither side lends to the other. Nobody moves.",
                 hasR:true}
 ];
 /* ⚠ WHAT THE CHIEF-COMPLAINT FIELD CAN AND CANNOT SEE. Blake's bed-required list is a clinical
@@ -1567,12 +1594,12 @@ function drawSpaces(){
   const m=modeOf(), rows=[];
   rows.push(ctl("A", m.id==="pooled" ? "Spaces in the group"
                   : m.id==="bedfirst" ? "ED rooms the lane can use"
-                  : m.id==="stream"   ? "Beds — for the patients sorted to them" : "Assessment spaces",
-                S.A, 1, 14, false));
+                  : m.id==="stream"   ? "Rooms — for the patients sorted to them" : "Assessment spaces",
+                S.A, 1, 14));
   if(m.hasR) rows.push(ctl("R", m.id==="bedfirst" ? "Chairs — overflow only"
                              : m.id==="stream"   ? "Chairs — for everyone else"
                              : "Second area — results &amp; discharge pending",
-                            S.R, 1, 16, false));
+                            S.R, 1, 16));
   const tot = S.A + (m.hasR?S.R:0);
   rows.push(`<div class="total"><span>Spaces in use</span><b class="num" id="spaceTot">${tot}${S.budget?" of "+S.budget:""}</b></div>`);
   /* Only a DIVIDED lane has to be asked: the rooms-first layout is rooms by definition and the
@@ -1603,11 +1630,11 @@ function drawSpaces(){
     `<div class="hint" style="margin-top:8px">Fixed at ${S.budget} spaces — moving one takes from the
      other. <a href="#" id="unlock">Unlock the total</a> to add more.</div>`);
   const un=$("unlock"); if(un) un.onclick=e=>{e.preventDefault();S.budget=0;drawSpaces();run()};
-  function ctl(k,label,val,min,max,dis){
+  function ctl(k,label,val,min,max){
     return `<div class="ctl"><div class="ctl-top"><label for="s${k}">${label}</label>
       <output class="num" id="o${k}">${val}</output></div>
-      <input type="range" id="s${k}" data-k="${k}" min="${min}" max="${max}" step="1" value="${val}"${dis?" disabled":""}>
-      ${dis?'<div class="hint">Fixed — this layout uses the 8 rooms.</div>':""}</div>`;
+      <input type="range" id="s${k}" data-k="${k}" min="${min}" max="${max}" step="1" value="${val}">
+</div>`;
   }
 }
 
@@ -1769,7 +1796,7 @@ function syncSpeed(m){
   const s1 = $("asx");  if(s1 && +s1.value !== S.assess) s1.value = S.assess;
   const both = $("asxBoth");
   if(both) both.textContent = S.fastDischarge
-    ? " With \u201cmoves on once seen\u201d selected below, this is when the no-test patients move too."
+    ? " The half who need no test have their own dial below."
     : "";
 }
 
@@ -1936,10 +1963,10 @@ async function addEntry(){
   const who = ($("who").value||"").trim().slice(0,28);
   if(!who){ $("who").focus(); return }
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
-               bedcc:[...BEDPICK].sort((a,b)=>a-b).join("."), bedExtra:S.bedExtra, bedIntp:S.bedIntp,
+               bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
                assessNo:S.assessNo,
-               cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start, len:S.len};
+               cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len};
   const entry = {who, cfg, at: Date.now()};
   if(SHARED){
     const ok = await pushShared(entry);
@@ -1999,15 +2026,15 @@ function drawBoard(){
        row — it is a lane that was deliberately given no complaints, and evaluate scores it as
        taking nobody. Reading "" as everyone here handed back a different lane than the one
        ranked above it. */
-    PICK = c.cc === undefined
-         ? new Set(CC.map(x=>x.i))
+    PICK = c.cc === "-" ? new Set()
+         : c.cc === undefined ? new Set(CC.map(x=>x.i))
          : new Set(String(c.cc).split(".").filter(v=>v!=="").map(Number));
     /* ⚠ AND THE EXCLUSION LIST, for exactly the same reason — it lives in BEDPICK, not in S, so
        Object.assign cannot carry it either. Without this the row came back scored on its own
        list but DISPLAYING whichever list you happened to have, which is the same class of bug
        the criteria had. Undefined means a row from before the list existed: Blake's default,
        which is what evaluate() assumes for it too. */
-    BEDPICK = c.bedcc === undefined ? new Set(BED_IDS) : idSet(c.bedcc);
+    BEDPICK = c.bedcc === "-" ? new Set() : c.bedcc === undefined ? new Set(BED_IDS) : idSet(c.bedcc);
     S.bedIntp = c.bedIntp === true; S.bedGrp = c.bedGrp === true; S.roomsA = c.roomsA === true;
     drawModes(); drawSpaces(); drawWindow(); run();
   });
@@ -2040,8 +2067,13 @@ function hashState(){
      on every recompute, so a plain refresh did it, not just a shared link.
      Every field is written now, empty where it does not apply, and the reader indexes a known
      layout. Cheap in characters, and there is no arithmetic left to get wrong. */
-  c.push(PICK.size < CC.length ? [...PICK].sort((x,y)=>x-y).join(".") : "");   // 9  criteria
-  c.push([...BEDPICK].sort((x,y)=>x-y).join("."));                             // 10 bed list
+  /* ⚠ "-" IS "NONE", "" IS "THE DEFAULT". An empty Set joins to "", which the reader already
+     treats as "not narrowed" — so clearing the criteria, or clearing the room list, could not be
+     shared, saved or even survive a refresh: run() rewrites the hash on every recompute, and the
+     lane silently reverted to everyone. Pricing Blake's rule by clearing the list is one of the
+     things this page is FOR. */
+  c.push(PICK.size === 0 ? "-" : PICK.size < CC.length ? [...PICK].sort((x,y)=>x-y).join(".") : "");
+  c.push(BEDPICK.size === 0 ? "-" : [...BEDPICK].sort((x,y)=>x-y).join("."));   // 10 room list
   c.push(String(S.bedExtra));                                                  // 11
   c.push(S.bedIntp ? "1" : "0");                                               // 12
   c.push(S.bedGrp ? "1" : "0");                                                // 13
@@ -2080,9 +2112,10 @@ function fromHash(){
   /* ⚠ an empty criteria field means EVERY complaint, so it must RESET PICK, not leave it. A link
      is a full setting, like a preset — landing on an unnarrowed link while narrowed kept the old
      narrowing and scored a lane the link did not describe. */
-  PICK = at(9, "") !== "" ? new Set(String(p[9]).split(".").filter(v=>v!=="").map(Number))
-                          : new Set(CC.map(x=>x.i));
-  BEDPICK    = at(10, "") !== "" ? idSet(p[10]) : new Set(BED_IDS);
+  PICK = at(9, "") === "-" ? new Set()
+       : at(9, "") !== ""   ? new Set(String(p[9]).split(".").filter(v=>v!=="").map(Number))
+                            : new Set(CC.map(x=>x.i));
+  BEDPICK    = at(10, "") === "-" ? new Set() : at(10, "") !== "" ? idSet(p[10]) : new Set(BED_IDS);
   S.bedExtra = lim("bedExtra",  at(11, 0), 0);
   S.bedIntp  = at(12, "0") === "1";
   S.bedGrp   = at(13, "0") === "1";
@@ -2234,10 +2267,15 @@ function drawCriteria(){
     <b class="num">${String((S.start+S.len)%24).padStart(2,"0")}:00</b>
     on ${LEVELS[S.level].n.toLowerCase()} — <b class="num">${pts.toFixed(1)}</b> in total.
     Tap a complaint to take it or leave it${BEDMODE.has(S.mode)
-      ? `, and <b>bed</b> to say it needs one rather than a chair` : ``}.
-    <span class="dim">&ldquo;Doctor to decision&rdquo; is measured, and is the clearest signal of
-    who belongs in a chair lane &mdash; but it is <b>not</b> the moment they can move.
-    <b>Notes &amp; method</b> says why.</span>`;
+      ? `, and <b>room</b> to say it needs one rather than a chair` : ``}.
+    <span class="dim">&ldquo;Doctor to decision&rdquo; is how long from the doctor arriving to the
+    call being made, measured on every patient with that complaint &mdash;
+    ${Math.round(D.g.ddall)} min on average, ${Math.round(Math.min(...CC.map(x=>x.ddall)))} to
+    ${Math.round(Math.max(...CC.map(x=>x.ddall)))} across these. The long ones are the complaints
+    where something is DONE &mdash; a repair, a wound, a treatment and a re-check &mdash; or where
+    a result is being waited on. <b>It is not the moment they can move</b>: a patient can go
+    somewhere else once the assessment itself is finished, which happens inside this interval and
+    is recorded nowhere.</span>`;
   /* ⚠ ONE LIST, TWO DECISIONS. There were two complaint panels — take-or-leave, and
      needs-a-bed — over the same 26 rows, so in a bed layout you tapped the same complaint in two
      places to say two different things, and the two lists could silently disagree (the exclusion
@@ -2250,18 +2288,18 @@ function drawCriteria(){
      complaint: the ids, PICK, BEDPICK, the link and the board are all untouched, and two people
      sorting differently are still comparing the same lane. It is deliberately NOT in the link
      either — a view preference is not part of a lane.
-     Estimated entries go LAST when sorting by speed, whatever their number: their figure is the
-     lane-wide fallback rather than a measurement, and ranking them among measured ones would
-     invite exactly the comparison the dash exists to prevent. */
-  /* ⚠ the estimate rule applies to `fast` ONLY. `dd` is measured on the no-test group, which four
-     complaints barely have — but the TEST RATE is measured on every arrival, so it is real for all
-     26 and nothing needs sinking. Sinking them here would hide the very complaints a
-     fewest-tests ordering is meant to surface: ankle 99% and dysuria 98% belong at the bottom
-     because they are test-heavy, not because their figure is soft. */
+
+     ⚠ Both orderings run on ALL patients. `dd` is the doctor's time over the patients who needed
+     no test, which is what the ENGINE needs (the assessment time it scales applies to that half
+     alone) — but the row shows a test rate measured on everyone, so ranking by a
+     minority-subgroup figure compared two populations and reordered the list: on the no-test half
+     Fever reads 35 against Laceration's 71, and on all patients they are 70 and 76. A physician
+     concluding Fever was the twice-quicker chair patient would have had it backwards. Nothing
+     sinks in either ordering — every complaint has ample all-patient sample. */
   const order = S.ccSort === "fast"
-      ? CC.slice().sort((p, q) => (p.me ? 1 : 0) - (q.me ? 1 : 0) || p.dd - q.dd)
+      ? CC.slice().sort((p, q) => p.ddall - q.ddall)
     : S.ccSort === "test"
-      ? CC.slice().sort((p, q) => p.w - q.w || p.dd - q.dd)
+      ? CC.slice().sort((p, q) => p.w - q.w || p.ddall - q.ddall)
     : CC;
   $("ccList").innerHTML = order.map(x=>{
     const on = PICK.has(x.i), bed = BEDPICK.has(x.i);
@@ -2273,8 +2311,8 @@ function drawCriteria(){
           · doctor to decision <span class="num">${x.me ? "&mdash;" : Math.round(x.dd)}</span>${
             x.me ? `<span class="dim"> (too few without a test)</span>` : ` min`}</span></button>${
       bedMode ? `<button type="button" class="cc-bed" data-bed="${x.i}" aria-pressed="${bed}"
-          title="${bed ? "needs a bed — tap for a chair" : "can use a chair — tap for a bed"}"
-          ${on ? `` : `disabled`}>bed</button>` : ``}</div>`;
+          title="${bed ? "needs a room — tap to allow a chair" : "can use a chair — tap to require a room"}"
+          ${on ? `` : `disabled`}>room</button>` : ``}</div>`;
   }).join("");
   const sortSeg = $("ccSortSeg");
   if(sortSeg) sortSeg.querySelectorAll("[data-sort]").forEach(b=>{
@@ -2325,10 +2363,10 @@ function requestRun(){
 function run(){
   const m=modeOf(), lvl=LEVELS[S.level];
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
-               bedcc:[...BEDPICK].sort((a,b)=>a-b).join("."), bedExtra:S.bedExtra, bedIntp:S.bedIntp,
+               bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
                assessNo:S.assessNo,
-               cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start, len:S.len, bar:S.bar};
+               cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len, bar:S.bar};
   const E = evaluate(cfg, lvl.pts), o = E.o;
   drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
   $("speedCtl").querySelectorAll("[data-fd]").forEach(bt=>bt.onclick=()=>{
@@ -2353,7 +2391,7 @@ function run(){
      rooms. Either can bind, so both are offered and the worse one is named. */
   const sides = [];
   if(m.id==="bedfirst"){
-    const hold = D.hold_all*fPace, br = liveBedShare();
+    const hold = D.hold_all*fPace, br = bedShareDisplay(liveBedShare(), S.bedGrp);   // as routed
     sides.push({n:"estate", spaces:S.A+S.R, thing:"rooms and chairs together", coming: E.accepted,
                 load: E.accepted*hold/((S.A+S.R)*mins), cap: (S.A+S.R)*mins/hold});
     if(br > 0) sides.push({n:"rooms", spaces:S.A, coming: E.accepted*br,
@@ -2364,8 +2402,13 @@ function run(){
        "the estate" is not a meaningful denominator: each side sees only its own share of the
        arrivals and only its own spaces, so they are sized independently and the worse one is
        named. It also read "assessment spaces" here, which is not what a stream lane has. */
-    const hold = D.hold_all*fPace, br = liveBedShare();
-    sides.push({n:"beds", spaces:S.A, thing:"beds", coming: E.accepted*br,
+    /* ⚠ the share the ENGINE routes, not the drawn share. liveBedShare() deliberately excludes
+       siblings (sim() forces parties into rooms structurally), so sizing the two sides from it
+       under-counts the room side — and with the sibling rule ON BY DEFAULT the banner named
+       chairs as the tight spot on a lane whose rooms were the jam, directly contradicting the
+       stream boards printed underneath it. */
+    const hold = D.hold_all*fPace, br = bedShareDisplay(liveBedShare(), S.bedGrp);
+    sides.push({n:"rooms", spaces:S.A, thing:"rooms", coming: E.accepted*br,
                 load: br ? E.accepted*br*hold/(S.A*mins) : 0, cap: S.A*mins/hold});
     sides.push({n:"chairs", spaces:S.R, thing:"chairs", coming: E.accepted*(1-br),
                 load: E.accepted*(1-br)*hold/(S.R*mins), cap: S.R*mins/hold});
@@ -2402,7 +2445,7 @@ function run(){
      not separate queues and splitting them would invent a distinction the model does not make. */
   const twoStream = m.id === "stream" && o.streams && !o.idle;
   $("streamBoards").innerHTML = !twoStream ? `` : [
-    ["Beds",   o.streams[1], S.A, "sorted to a bed"],
+    ["Rooms",  o.streams[1], S.A, "sorted to a room"],
     ["Chairs", o.streams[0], S.R, "everyone else"]
   ].map(([name, st, spaces, who]) => `<div class="strm">
       <div class="strm-h">${name} <span class="dim">· ${spaces} space${spaces===1?"":"s"} · ${who}</span></div>
@@ -2418,22 +2461,26 @@ function run(){
   $("hero").innerHTML = [
     [`${E.score.toFixed(1)}`, `minutes per ESI 4/5 patient arriving that day, lower is better —
       against ${E.base.toFixed(1)} for ${(BARS[S.bar]||BARS.today).n}`,
-      E.delta>0.5 ? "is-hold" : E.delta<-0.5 ? "is-breach" : ""],
+      /* ⚠ NO COLOUR VERDICT. The intro says there is no pass mark, and these cards were quietly
+         delivering two: green for beating today, red once more than 2% were still waiting. A
+         reader who takes the intro at its word then asks what the red means, and the honest
+         answer is "a threshold nobody told you about" — the same reason the 15-minute target was
+         taken out. The comparison is in the words underneath, where it can be argued with. */
+      ""],
     [o.idle ? "—" : `${o.perArrival.toFixed(1)}`,
      /* "the lane accepts" is arithmetically right — the denominator is every arrival into the
         lane's stream — but it reads as "got a chair", two cards from one counting who did not. */
      o.idle ? "nobody in the lane"
-            : "minutes per patient arriving into the lane — including the ones it later sends away", ""],
-    [`${Math.round(100*E.cover)}%`, `of the day's ${lvl.pts} patients go through the lane`,
-      E.cover<0.2 ? "is-breach" : ""],
-    [o.idle ? "—" : `${o.diverted.toFixed(1)}`, "still waiting when it closes — sent to the main department",
-      o.divPct>2 ? "is-breach" : ""],
+            : "minutes per patient the lane sees, including those it sends away", ""],
+    [`${Math.round(100*E.cover)}%`, `of the day's ${lvl.pts} patients go through the lane`, ""],
+    [o.idle ? "everyone" : `${o.diverted.toFixed(1)}`,
+     o.idle ? "the lane takes nobody, so the main department sees them all"
+            : "still waiting when it closes — sent to the main department", ""],
     /* Peak concurrent, not the space count: capacity is what you set aside, this is what the
        lane actually reached. They differ whenever the lane is not full at its busiest. */
     [o.idle ? "—" : `${o.peak.toFixed(1)}`,
      o.idle ? "nobody in the lane"
-            : `patients in the lane at once at its busiest — the physician's peak load, of
-               ${S.A + (m.hasR?S.R:0)} spaces`, ""]
+            : `in the lane at once at its busiest, of ${S.A + (m.hasR?S.R:0)} spaces`, ""]
   ].map(([v,k,c])=>`<div class="stat ${c}"><div class="v num">${v}</div><div class="k">${k}</div></div>`).join("");
 
   const top = Math.max(6, Math.ceil(o.worst*1.15));

@@ -535,12 +535,14 @@ setTimeout(()=>{
       ? "yes (same 26 complaints, different order, identical score)"
       : "FAIL — set " + sameSet + ", reordered " + (idsByVol.join() !== idsByFast.join())
         + ", score " + scoreVol.toFixed(2) + " vs " + scoreFast.toFixed(2));
-  /* and the estimates sink, because their figure is a fallback rather than a measurement */
-  const tailIds = idsByFast.slice(-4).map(Number);
-  console.log("estimates sink to the bottom:",
-    tailIds.every(i => CC.find(x=>x.i===i).me)
-      ? "yes (the four dashed complaints are last)"
-      : "FAIL — the tail is " + tailIds.map(i=>CC.find(x=>x.i===i).n).join(", "));
+  /* ⚠ the row shows ddall (every patient), not dd (the no-test half) — the two orderings differ
+     substantially and the row's test rate is over everyone, so a minority-subgroup doctor time
+     beside it was comparing two populations. */
+  const ddSeq = idsByFast.map(i => CC.find(x=>x.i===Number(i)).ddall);
+  console.log("fast order uses all patients:",
+    ddSeq.every((v,k) => k===0 || ddSeq[k-1] <= v + 1e-9)
+      ? "yes (" + ddSeq[0].toFixed(0) + " to " + ddSeq[ddSeq.length-1].toFixed(0) + " min)"
+      : "FAIL — not ascending on ddall");
   /* the third ordering: fewest tests first. `w` is measured on EVERY arrival, unlike `dd`, so
      nothing sinks here — and a check that it does not, because sinking would hide exactly the
      test-heavy complaints this ordering exists to surface. */
@@ -562,6 +564,77 @@ setTimeout(()=>{
   console.log("test order keeps the same set:", sameAsVol ? "yes" : "FAIL — the set changed");
 
   S.ccSort = "vol";
+
+  /* ── the six the v2 sweep found ──────────────────────────────────────────
+     None of the 52 checks above caught any of them, and four lived behind handlers the stub
+     could not reach. */
+
+  /* 10. THE STAGE MUST SHOW WHAT THE ENGINE IS HOLDING. A patient who moves produces two release
+         events with one id; the stage resolved the pool by looking up where they are NOW, so the
+         first release blanked the chair they were sitting in. On the shipped defaults the second
+         area was drawn short for 362 of 480 minutes. This is the page's own printed promise. */
+  S.mode="split"; S.A=6; S.R=4; S.fastDischarge=true; S.turnRoom=10; S.turnChair=1;
+  PICK = new Set(CC.map(x=>x.i)); run(); buildTrace();
+  let worstGap = 0, engA = 0, engB = 0;
+  {
+    const seen = new Map();
+    for(const e of PLAY.trace){
+      if(e.ev === "assess") engA++;
+      else if(e.ev === "second"){ engB++; }
+      else if(e.ev === "free"){ if(e.pool === "A") engA--; else engB--; }
+      const st = stageState(e.t);
+      // ⚠ a space being turned over IS still held by the engine — it has not decremented rb yet —
+      //   so it counts as occupied here. Excluding it made the check fail on its own definition.
+      const showB = st.B.filter(v => v !== null).length;
+      const trueB = Math.max(0, engB);
+      if(trueB - showB > worstGap) worstGap = trueB - showB;
+    }
+  }
+  console.log("stage shows what is occupied:", worstGap === 0
+    ? "yes (no minute draws the second area emptier than it is)"
+    : "FAIL — the stage under-shows the second area by up to " + worstGap + " chairs");
+
+  /* 11. THE ESTATE SURVIVES A MODE CHANGE. Clicking through the four layouts grew the lane
+         6+4 -> 10 -> 10+4 -> 12+4, so the later ones scored better for having more spaces. */
+  S.mode="split"; S.A=6; S.R=4; drawModes();
+  const sizes = [];
+  for(const want of ["pooled","bedfirst","stream","split"]){
+    const btn = document.getElementById("modes").querySelectorAll("[data-m]").find(b=>b.dataset.m===want);
+    if(btn && btn.onclick) btn.onclick();
+    sizes.push(S.A + (modeOf().hasR ? S.R : 0));
+  }
+  console.log("the estate survives a switch :", sizes.every(v => v === 10)
+    ? "yes (10 spaces through all four layouts)"
+    : "FAIL — clicking through gave " + sizes.join(", "));
+
+  /* 12. AN EMPTY LIST IS NOT THE DEFAULT LIST. "" already meant "not narrowed", so clearing a
+         list could not be shared, saved or survive a refresh — and pricing the rule by clearing
+         it is one of the things the page is for. */
+  S.mode="bedfirst"; S.A=6; S.R=4; BEDPICK = new Set(); PICK = new Set(CC.map(x=>x.i));
+  location.hash = encodeURIComponent(hashState());
+  BEDPICK = new Set(BED_IDS); fromHash();
+  const emptyBedKept = BEDPICK.size === 0;
+  PICK = new Set(); location.hash = encodeURIComponent(hashState());
+  PICK = new Set(CC.map(x=>x.i)); fromHash();
+  console.log("an empty list stays empty   :", emptyBedKept && PICK.size === 0
+    ? "yes (both lists survive a link and a refresh)"
+    : "FAIL — rooms kept " + emptyBedKept + ", criteria size " + PICK.size);
+  PICK = new Set(CC.map(x=>x.i)); BEDPICK = new Set(BED_IDS); location.hash = "";
+
+  /* 13. THE BANNER MUST NAME THE SIDE THE ENGINE JAMS. It sized the two streams from the drawn
+         share, which excludes siblings by design, so with the sibling rule ON — the default — it
+         named chairs on a lane whose rooms were the jam, contradicting the boards beneath it. */
+  S.mode="stream"; S.A=2; S.R=8; S.bedGrp=true; run();
+  const bannerSide = document.getElementById("load").innerHTML.indexOf("rooms") >= 0 ? "rooms" : "chairs";
+  const strm = evaluate({mode:"stream",A:2,R:8,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
+      fastDischarge:false, cc:[...PICK].sort((a,b)=>a-b).join("."), bedcc:[...BED_IDS].join("."),
+      bedIntp:true, bedGrp:true, start:15, len:8, bar:S.bar,
+      turnRoom:10, turnChair:1}, LEVELS[2].pts).o;
+  const jamSide = strm.streams[1].wait > strm.streams[0].wait ? "rooms" : "chairs";
+  console.log("the banner names the jam    :", bannerSide === jamSide
+    ? "yes (" + jamSide + ", matching the boards)"
+    : "FAIL — banner says " + bannerSide + ", the boards say " + jamSide);
+  S.mode="split"; S.A=6; S.R=4;
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 

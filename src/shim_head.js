@@ -17,7 +17,35 @@ const mk=id=>({id,_h:"",_t:"",value:"",hidden:false,style:{},dataset:{},_kids:[]
   set innerHTML(v){this._h=String(v); this._parse()}, get innerHTML(){return this._h},
   set textContent(v){this._t=String(v)}, get textContent(){return this._t},
   set className(v){this._c=v}, get className(){return this._c},
-  querySelectorAll:()=>[], insertAdjacentHTML(){}, focus(){}});
+  /* ⚠ REAL BUTTONS, NOT AN EMPTY LIST. This returned [] , so every onclick the page wires —
+     the mode buttons, presets, complaint rows, room chips, the sort segment, the tabs, the
+     board's load buttons — was assigned and never reachable. Whole classes of bug lived behind
+     handlers where no check could see them (the mode buttons quietly grew the lane's estate on
+     every click, and nothing noticed for a day). Parse the buttons out of the markup and hand
+     back objects the page can attach to and a test can click. */
+  querySelectorAll(sel){
+    const want = (sel.match(/\[([a-zA-Z-]+)(?:=)?/)||[])[1];
+    const out = [];
+    const re = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
+    let m;
+    while((m = re.exec(this._h))){
+      const attrs = m[1], inner = m[2];
+      const data = {};
+      let a; const ar = /data-([a-zA-Z-]+)="([^"]*)"/g;
+      while((a = ar.exec(attrs))) data[a[1].replace(/-([a-z])/g, (_,c)=>c.toUpperCase())] = a[2];
+      if(want && want !== "button" && !(want.replace(/^data-/, "").replace(/-([a-z])/g,(_,c)=>c.toUpperCase()) in data)
+         && attrs.indexOf(want) < 0) continue;
+      const el = {dataset:data, disabled:/\bdisabled\b/.test(attrs), _attr:{},
+        innerHTML:inner, textContent:inner.replace(/<[^>]*>/g,""),
+        getAttribute(k){ const g=new RegExp(k+'="([^"]*)"').exec(attrs); 
+                         return k in this._attr ? this._attr[k] : (g?g[1]:null) },
+        setAttribute(k,v){ this._attr[k]=String(v) }, onclick:null, oninput:null,
+        querySelectorAll:()=>[] };
+      out.push(el);
+    }
+    return out;
+  },
+  insertAdjacentHTML(v, html){ this._h += String(html); this._parse() }, focus(){}});
 /* ⚠ A CONTROL MISSING FROM THIS SET IS INVISIBLE TO THE HARNESS AND NEVER RENDERS.
    getElementById returns null for anything not listed, so its draw function returns early
    and every check still prints yes. On 2026-08-22 the turnover sliders, the no-test

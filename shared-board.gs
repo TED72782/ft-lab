@@ -130,10 +130,16 @@ function doPost(e) {
     sh.appendRow([who, String(c.mode), Number(c.A) || 0, Number(c.R) || 0,
                   Number(c.cyc) || 0, Number(c.assess) || 0, c.fastDischarge === true,
                   Number(b.at) || Date.now(),
-                  c.cc === undefined || c.cc === '' ? '' : "'" + String(c.cc),
+                  /* ⚠ '' AND "none" ARE DIFFERENT LANES. read_() maps a blank cell back to
+                     undefined, which the page reads as "the default" — so a lane saved with the
+                     criteria cleared came back taking EVERY complaint, and one saved with the room
+                     list cleared came back with Blake's three. Eight minutes of score on a board
+                     whose layouts sit within one minute of each other. The page sends "-" for an
+                     empty set; store it. */
+                  c.cc === undefined ? '' : "'" + String(c.cc),
                   c.start === undefined || c.start === null || c.start === '' ? 15 : Number(c.start),
                   c.len === undefined || c.len === null || c.len === '' ? 8 : Number(c.len),
-                  c.bedcc === undefined || c.bedcc === '' ? '' : "'" + String(c.bedcc),
+                  c.bedcc === undefined ? '' : "'" + String(c.bedcc),
                   c.bedExtra === undefined || c.bedExtra === null || c.bedExtra === '' ? ''
                     : Number(c.bedExtra),
                   c.bedIntp === true,
