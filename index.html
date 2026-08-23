@@ -1481,7 +1481,7 @@ let BEDPICK = new Set(BED_IDS);            // which complaints must have a room
    the extra applies to whoever is left after the ticked complaints are taken out.
 
    Computed from a cfg rather than from live state, so a board row scores on ITS OWN list. */
-function bedShareOf(keep, bedKeep, extra, intp, grp){
+function bedShareOf(keep, bedKeep, extra, intp){
   const sel = CC.filter(x=>keep.has(x.i)), tot = sel.reduce((a,x)=>a+x.s, 0);
   if(!tot) return 0;
   const ccPart = sel.filter(x=>bedKeep.has(x.i)).reduce((a,x)=>a+x.s, 0) / tot;
@@ -2156,7 +2156,14 @@ function toHash(){
   return location.origin + location.pathname + q + "#" + encodeURIComponent(c);
 }
 function fromHash(){
-  const h = decodeURIComponent(location.hash.slice(1)); if(!h) return;
+  /* ⚠ decodeURIComponent THROWS on a stray '%'. The hash is percent-encoded, so a chat client
+     that truncates a long link mid-escape hands back exactly that — and an uncaught throw here
+     kills the page before any handler is wired. Fall back to the raw text: a lane that parses
+     wrong then clamps is recoverable, a page that never loads is not. */
+  let h;
+  try{ h = decodeURIComponent(location.hash.slice(1)) }
+  catch(e){ h = location.hash.slice(1) }
+  if(!h) return;
   const p = h.split(","); if(p.length<7) return;
   if(!MODES.some(m=>m.id===p[0])) return;
   /* ⚠ 8-field links from the retired-target era are [mode..fd, TARGET, level] — the old
@@ -2165,7 +2172,13 @@ function fromHash(){
      outlived it. Clamp regardless: a garbage level from ANY malformed link must not brick
      a page whose first run() happens before a single handler is wired. */
   const rawLvl = p.length===8 ? +p[7] : +p[6];
-  const lvl = Number.isFinite(rawLvl) ? Math.max(0, Math.min(LEVELS.length-1, rawLvl)) : 1;
+  /* ⚠ ROUND, not just clamp. `level` is the one numeric field that does not go through lim(), and
+     lim() is what rounds — so #...,1.5,... clamped cleanly into range and stayed FRACTIONAL.
+     LEVELS[1.5] is undefined and there are 12 unguarded LEVELS[S.level] reads, so the first run()
+     threw before a single handler was wired: a half-drawn page with Add, Play and Copy link all
+     dead and no visible error. Exactly the failure the comment above commemorates — that guard
+     caught the out-of-RANGE case and not the wrong-TYPE one. */
+  const lvl = Number.isFinite(rawLvl) ? Math.max(0, Math.min(LEVELS.length-1, Math.round(rawLvl))) : 1;
   Object.assign(S, {mode:p[0], A:lim("A",p[1],6), R:lim("R",p[2],4),   // refit below cyc:lim("cyc",p[3],Math.round(D.T_A)),
                     assess:lim("assess",p[4],44), fastDischarge:p[5]==="1", level:lvl, budget:0,
                     start: p.length>=9 ? lim("start",p[7],15) : 15,
@@ -2367,10 +2380,17 @@ function drawCriteria(){
      its population; the fix for two populations side by side is to label them, not to swap in a
      number that measures waiting for radiology. Rows with too few no-test patients fall back to
      the lane figure and show a dash. */
+  /* ⚠ A ROW WITH NO MEASUREMENT IS NOT RANKED. Four complaints have too few no-test patients and
+     fall back to the lane figure (41 min) — Ankle, Foot, Musculoskeletal and Dysuria, i.e. three
+     of the five complaints this whole lab is about. Sorting them by that fallback placed them at
+     ranks 11, 13 and 14 of 26, dead centre, by a number nobody measured; the row shows a dash
+     while the ORDER quietly asserted a value. They now sort to the end, where the dash means
+     what it says. */
+  const rank = (a, b) => (a.me ? 1 : 0) - (b.me ? 1 : 0) || a.dd - b.dd;
   const order = S.ccSort === "fast"
-      ? CC.slice().sort((p, q) => p.dd - q.dd)
+      ? CC.slice().sort(rank)
     : S.ccSort === "test"
-      ? CC.slice().sort((p, q) => p.w - q.w || p.dd - q.dd)
+      ? CC.slice().sort((p, q) => p.w - q.w || rank(p, q))
     : CC;
   $("ccList").innerHTML = order.map(x=>{
     const on = PICK.has(x.i), bed = BEDPICK.has(x.i);

@@ -570,7 +570,9 @@ setTimeout(()=>{
      `dd`, so "fastest first" gave an order the column contradicted. It ranks on `dd` — 44-68% of
      `ddall` is time before the first RESULT lands, worst on the extremity complaints, so ranking
      on it puts the best chair candidates at the slow end. */
-  const ddSeq = idsByFast.map(i => CC.find(x=>x.i===Number(i)).dd);
+  /* measured rows only — the unmeasured ones now sort to the end by rule (see 10w), so the
+     underlying dd sequence is ascending WITHIN the measured group, not across the whole list */
+  const ddSeq = idsByFast.map(i => CC.find(x=>x.i===Number(i))).filter(x=>!x.me).map(x=>x.dd);
   // the PRINTED numbers, not just the underlying field — that gap is what the bug was.
   const shown = [...document.getElementById("ccList").innerHTML
       .matchAll(/doctor to decision, no test <span class="num">([^<]+)</g)]
@@ -641,6 +643,44 @@ setTimeout(()=>{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10x. FUZZ THE LINK, DO NOT SPOT-CHECK IT. The malformed-link guard used five fixed strings
+          and none touched field 7 (`level`), which is the ONE numeric field that does not go
+          through lim() — so a fractional level clamped into range and stayed fractional,
+          LEVELS[1.5] came back undefined, and the first run() threw before a single handler was
+          wired. A half-drawn page with Add, Play and Copy link all dead. Mutating every field
+          instead of five hand-picked ones is what finds that class. */
+  const CANON = "split,6,4,76,44,0,1,15,8,,2.9.24,0,1,1,10,1,0,44".split(",");
+  const POISON = ["", "x", "-3", "1.5", "0.5", "NaN", "Infinity", "1e9", "999999", "-0", "  ", "%%"];
+  let fuzzBad = "", fuzzN = 0;
+  for(let f = 0; f < CANON.length && !fuzzBad; f++){
+    for(const bad of POISON){
+      const parts = CANON.slice(); parts[f] = bad;
+      location.hash = "#" + parts.join(",");
+      try{
+        fromHash(); drawPresets(); drawModes(); drawSpaces(); drawWindow(); run();
+        fuzzN++;
+        if(!Number.isInteger(S.level) || !LEVELS[S.level]) fuzzBad = "field "+f+"='"+bad+"' -> level "+S.level;
+        else if(!Number.isInteger(S.A) || !Number.isInteger(S.R)) fuzzBad = "field "+f+"='"+bad+"' -> "+S.A+"/"+S.R;
+        else if(!modeOf()) fuzzBad = "field "+f+"='"+bad+"' -> no mode";
+      }catch(err){ fuzzBad = "field "+f+"='"+bad+"' THREW: " + err.message }
+    }
+  }
+  console.log("every link field survives    :", !fuzzBad
+    ? "yes (" + fuzzN + " mangled links, all clamp to a lane the page can draw)"
+    : "FAIL — " + fuzzBad);
+
+  /* 10w. AN UNMEASURED ROW IS NOT RANKED. Four complaints fall back to the lane figure and show a
+          dash; sorting by that fallback placed three of the lab's five key complaints mid-table by
+          a number nobody measured. They must sit at the end of the "fastest first" order. */
+  S.mode="split"; S.A=6; S.R=4; PICK=new Set(CC.map(x=>x.i)); S.ccSort="fast"; run();
+  const ids = [...document.getElementById("ccList").innerHTML.matchAll(/data-cc="(\d+)"/g)].map(m=>Number(m[1]));
+  const meAt = ids.map((i,k)=>({me: !!CC.find(x=>x.i===i).me, k})).filter(x=>x.me).map(x=>x.k);
+  const nMe = CC.filter(x=>x.me).length;
+  console.log("unmeasured rows sort last   :", nMe > 0 && meAt.length === nMe
+      && meAt.every(k => k >= ids.length - nMe)
+    ? "yes (" + nMe + " fallback rows, all at the end of " + ids.length + ")"
+    : "FAIL — " + nMe + " fallback rows at positions " + meAt.join(","));
+
   /* 10y. A PASTED LINK MUST LAND IN AN ALREADY-OPEN TAB. fromHash() ran once at startup and
           nothing listened after, so a colleague's lane pasted into an open tab changed the address
           bar and NOTHING else — the page kept showing the lane you already had. That is the worst
