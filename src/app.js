@@ -137,7 +137,7 @@ function sim(cfg){
            is exactly HALF for the same mean. The guard caught precisely that factor of two (8.4
            modelled against 16.8 measured). Physician time per patient is variable anyway; a fixed
            number was the modelling error, not the inversion. */
-        docFree[i] = start + expo(r, 1/docMin);   // expo() takes a RATE, not a mean
+        docFree[i] = start + expo(r, 1/(docMin * (load ? load[hb(t)] : 1)));
         qSum += start - t; qN++;
         return start - t; };
       const holdOf = (t, w, raw) => {
@@ -151,17 +151,14 @@ function sim(cfg){
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        /* ⚠ SERVICE TIMES STRETCH WHEN THE DEPARTMENT IS BUSY, and the load is the DEPARTMENT's,
-           not this lane's. Measured within date x hour x test-status cells: log(hold) rises
-           +2.7% per extra patient present at rooming (t=3.8), x1.50 from the 10th to the 90th
-           percentile of occupancy. Put the lane's own occupancy in the same regression and only
-           the department's survives (+2.76% t=2.47 against the lane's +1.53% t=0.98), so this is
-           an EXOGENOUS multiplier and deliberately NOT a feedback: a fuller lane does not slow
-           itself down. Modelling it the other way would invent a loop the data does not show and
-           would exaggerate the penalty for small lanes — the direction that changes which layout
-           wins. `load` is 1 everywhere when the dial is off, and the engine is then identical. */
-        const lf = load ? load[hb(t)] : 1;
-        const total = holdOf(t, w, (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf);
+        /* ⚠ THE CROWDING MULTIPLIER IS ON THE PROVIDER, NOT ON THE PATIENT'S CARE — corrected
+           once the queue above existed, and the correction is the operator's question answered.
+           It was first fitted on the WHOLE space hold and applied here. But the whole hold
+           CONTAINS the roomed-to-doctor queue, and split apart the effect is entirely the queue:
+           whole hold +3.68% (t=4.6), queue +15.4% (t=10.6), post-doctor hold +0.49% (t=0.50).
+           Department load does not slow CARE at all; it slowed the thing the engine now models
+           explicitly, so scaling here was double-counting. It moved to docMin above. */
+        const total = holdOf(t, w, w ? pick(r,asw)+pick(r,res) : pick(r,now));
         if(pooled){ second[tag]=0; ev.push([t+total,1,tag]); return }
         if(!w && !fastDischarge){ second[tag]=0; ev.push([t+total,1,tag]); return }
         /* ⚠ THE TWO HALVES ARE ASSESSED SEPARATELY. `assessMin` is measured on patients who HAD
@@ -170,10 +167,9 @@ function sim(cfg){
            of an assessment for someone with no order, so the no-test half is its own control.
            Measured 2026-08-22 on a 6+4 lane: the score runs 70.0 -> 21.0 across the range, which is
            an order of magnitude more than the gaps between the layouts this page compares. */
-        /* the assessment point stretches with the hold, so the two phases keep their proportions;
-           ⚠ the phase SPLIT of the stretch is not separately verified — assessment and
-           results-waiting are scaled alike because the coefficient was fitted on the whole hold */
-        const a = Math.min(((w ? assessMin : (assessNo ?? assessMin)) ?? D.g.asw) * lf, total-1);
+        /* the assessment point is no longer scaled by department load either: that multiplier
+           moved onto the provider, where the data puts it */
+        const a = Math.min((w ? assessMin : (assessNo ?? assessMin)) ?? D.g.asw, total-1);
         second[tag] = Math.max(1, total-a);
         ev.push([t+a,1,tag]) };
       const startB = (t,tag) => { rb++;
@@ -234,8 +230,7 @@ function sim(cfg){
          is inert at zero, so anything applied to one and not the other separates them. */
       const draw = (tag, t) => { const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        const lf = load ? load[hb(t)] : 1;
-        return holdOf(t, w, (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf) };
+        return holdOf(t, w, w ? pick(r,asw)+pick(r,res) : pick(r,now)) };
       const startBed = (t,tag) => { ab++;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         second[tag]=0; ev.push([t+draw(tag,t),1,tag]) };
