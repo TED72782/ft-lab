@@ -1444,7 +1444,7 @@ function evaluate(cfg, dayTotal){
      per-hour service-time multiplier. `loadK` is the reader's dial: 0 reproduces the engine
      exactly as it was, 1 is the effect as measured. Clamped because the exponential runs away on
      a heavy day at the peak hour and no measurement supports extrapolating that far. */
-  const loadK = cfg.loadK ?? 1;
+  const loadK = (cfg.loadPct ?? 100) / 100;
   const load = (D.occ24 && D.load_beta)
     ? hours.map(h => Math.max(0.6, Math.min(1.8,
         Math.exp(loadK * D.load_beta * (D.occ24[h % 24] * fac - D.occ_ref)))))
@@ -1489,7 +1489,7 @@ function evaluate(cfg, dayTotal){
   const laneMin = o.idle ? 0 : o.perArrival * accepted;
   const score = dayTotal ? (laneMin + divMin + outMin) / dayTotal : B.mean;
 
-  return {o, m, hours, accepted, share, dayTotal, score, assessNoEff, base:B.mean, delta:B.mean-score,
+  return {o, m, hours, accepted, share, dayTotal, score, assessNoEff, load, base:B.mean, delta:B.mean-score,
           cover: dayTotal ? accepted/dayTotal : 0};
 }
 
@@ -1642,7 +1642,7 @@ const LEVELS = [
 // as acceptable is a judgement for the room, not a line in a chart.
 const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
            fastDischarge:false, level:1, bar:"today", start:15, len:8, bedExtra:0, bedIntp:true,
-           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, ccSort:"vol",
+           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, ccSort:"vol",
            /* ⚠ AN ASSUMPTION, AND IT HAS TO BE. It was briefly set to 67 — roomed -> DECISION —
               on the reading that a no-test patient can only leave the assessment space once the
               call is made. Operator, 2026-08-22: they can move as soon as the ASSESSMENT is done,
@@ -1660,7 +1660,7 @@ const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
    RangeError, which happened before a single button was wired, so Add / Play / Copy link were
    all inert. Limits mirror the sliders, so a clamped link lands somewhere the UI can show. */
 const LIM = {A:[1,30], R:[0,16], cyc:[55,115], assess:[10,90], assessNo:[10,120],
-             start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15]};
+             start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15], loadPct:[0,200]};
 /* ⚠ ONE PLACE DECIDES WHAT A LAYOUT CAN HOLD. A divided lane splits across two sliders (14+16)
    while a pooled one has a single slider, so the same estate is not representable the same way —
    and the mode switch used to resolve that by DISCARDING the difference. It refits instead: the
@@ -1839,9 +1839,21 @@ function drawTurn(){
        <input type="range" id="trn" min="0" max="30" step="1" value="${S.turnRoom}"></div>
        <div class="ctl"><div class="ctl-top">
          <label for="trc">Turning over a chair</label><output class="num" id="trcOut"></output></div>
-       <input type="range" id="trc" min="0" max="15" step="1" value="${S.turnChair}"></div>`;
+       <input type="range" id="trc" min="0" max="15" step="1" value="${S.turnChair}"></div>
+       <div class="ctl"><div class="ctl-top">
+         <label for="ldk">How much a busy department slows everything</label>
+         <output class="num" id="ldkOut"></output></div>
+       <input type="range" id="ldk" min="0" max="200" step="10" value="${S.loadPct}"></div>
+       <div class="hint">Holds are measurably longer when the department is full &mdash; about
+         <b>2.7% per extra patient</b> in the building, which is half again as long at a busy hour
+         as at a quiet one. It is the <b>department's</b> load, not this lane's: put both in the
+         same comparison and only the department's survives, so a fuller lane does not slow itself
+         down. <b>100% is the effect as measured; 0 turns it off.</b> Whether crowding
+         <i>causes</i> the stretch is not established &mdash; a slow shift produces both &mdash;
+         which is why it is a dial.</div>`;
     $("trn").oninput = e => { S.turnRoom  = +e.target.value; syncTurn(); requestRun() };
     $("trc").oninput = e => { S.turnChair = +e.target.value; syncTurn(); requestRun() };
+    $("ldk").oninput = e => { S.loadPct   = +e.target.value; syncTurn(); requestRun() };
   }
   syncTurn();
 }
@@ -1851,6 +1863,8 @@ function syncTurn(){
   if(b) b.textContent = S.turnChair + " min";
   const x=$("trn"); if(x && +x.value !== S.turnRoom) x.value = S.turnRoom;
   const y=$("trc"); if(y && +y.value !== S.turnChair) y.value = S.turnChair;
+  const c=$("ldkOut"); if(c) c.textContent = S.loadPct + "%";
+  const z=$("ldk"); if(z && +z.value !== S.loadPct) z.value = S.loadPct;
 }
 
 function drawSpeed(m){
@@ -2113,6 +2127,10 @@ function sane(cfg){
              matches NO complaint. The row then scores as a lane that takes nobody: 49.96, the
              do-nothing baseline, against a true 27.53. bedcc is worse because it is silent —
              29.38 against 29.87, and the load button hands back an empty room list. */
+          /* ⚠ a row saved BEFORE this existed was scored without the stretch, so it must keep
+             being scored without it — defaulting to 100 would silently re-rank other people's
+             lanes under an effect they never chose. New rows always carry the field. */
+          loadPct: lim("loadPct", cfg.loadPct, 0),
           bedcc: cfg.bedcc ?? undefined, bedExtra: lim("bedExtra", cfg.bedExtra, 0),
           /* A row saved before the interpreter criterion existed was scored without it, so it
              must keep being scored without it — defaulting to true would silently re-rank other
@@ -2289,6 +2307,7 @@ function hashState(){
   c.push(String(S.turnChair));                                                 // 15
   c.push(S.roomsA ? "1" : "0");                                                // 16
   c.push(String(S.assessNo));                                                  // 17
+  c.push(String(S.loadPct));                                                   // 18
   return c.join(",");
 }
 function toHash(){
@@ -2337,6 +2356,8 @@ function fromHash(){
      no interpreter or sibling rule, one assessment time for both halves. Read by index; the
      old read-from-the-end rule mis-parsed any link whose optional blocks were absent. */
   const at = (i, dflt) => p.length > i && p[i] !== "" ? p[i] : dflt;
+  /* a link written before the load stretch existed was scored without it — see sane() */
+  S.loadPct = lim("loadPct", at(18, 0), 0);
   /* ⚠ an empty criteria field means EVERY complaint, so it must RESET PICK, not leave it. A link
      is a full setting, like a preset — landing on an unnarrowed link while narrowed kept the old
      narrowing and scored a lane the link did not describe. */
@@ -2626,7 +2647,7 @@ function run(){
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
                bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
-               assessNo:S.assessNo,
+               loadPct:S.loadPct, assessNo:S.assessNo,
                cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len, bar:S.bar};
   const E = evaluate(cfg, lvl.pts), o = E.o;
   drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
@@ -2771,7 +2792,7 @@ function run(){
   const critKey = `${S.start}|${S.len}|${S.level}|${[...PICK].sort((x,y)=>x-y).join(".")}`
     + `|${S.mode}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.ccSort}`;
   if(critKey !== lastCritKey){ lastCritKey = critKey; drawCriteria() }
-  const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}`;
+  const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}|${S.loadPct}`;
   if(bedKey !== lastBedKey){ lastBedKey = bedKey; drawBedList() }
   const boardKey = `${S.level}|${S.bar}`;
   if(boardKey !== lastBoardKey){ lastBoardKey = boardKey; drawBoard() }

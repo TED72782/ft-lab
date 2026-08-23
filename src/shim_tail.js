@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 80;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 84;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -103,7 +103,8 @@ setTimeout(()=>{ try{
               : "FAIL — got "+S.start+"/"+S.len);
   const live = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,
                          fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
-                         start:S.start, len:S.len, bar:S.bar}, LEVELS[S.level].pts).score;
+                         start:S.start, len:S.len, bar:S.bar, loadPct:S.loadPct},
+                        LEVELS[S.level].pts).score;
   console.log("loaded lane reproduces score:", Math.abs(live-rowScore) < 1.5
               ? "yes ("+live.toFixed(1)+" vs "+rowScore.toFixed(1)+")"
               : "FAIL — "+live.toFixed(1)+" live vs "+rowScore.toFixed(1)+" on the board");
@@ -508,7 +509,7 @@ setTimeout(()=>{ try{
       BEDPICK = new Set([2,9]);
       const want = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
         fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
-        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair,
+        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair, loadPct:S.loadPct,
         roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
       location.hash = encodeURIComponent(hashState());
       /* ⚠ SCRAMBLE EVERY FIELD, NOT A CHOSEN FEW. This wiped only assessNo, the two turnover
@@ -524,7 +525,7 @@ setTimeout(()=>{ try{
       fromHash();
       const got = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
         fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
-        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair,
+        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair, loadPct:S.loadPct,
         roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
       for(const k of Object.keys(want))
         if(String(want[k]) !== String(got[k]) && !rtFail)
@@ -617,11 +618,11 @@ setTimeout(()=>{ try{
   PICK = new Set(CC.map(x=>x.i)); run();
   const heroScore = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start,
-      len:S.len, bar:S.bar, turnRoom:S.turnRoom, turnChair:S.turnChair}, LEVELS[S.level].pts).score;
+      len:S.len, bar:S.bar, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct}, LEVELS[S.level].pts).score;
   const t0 = Date.now();
   const boardScore = scoreOf({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start,
-      len:S.len, turnRoom:S.turnRoom, turnChair:S.turnChair}, LEVELS[S.level].pts).score;
+      len:S.len, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct}, LEVELS[S.level].pts).score;
   const ms = Date.now() - t0;
   console.log("board scores what the page does:", Math.abs(heroScore - boardScore) < 1e-9
     ? "yes (" + heroScore.toFixed(2) + " both, " + ms + "ms a row)"
@@ -814,6 +815,62 @@ setTimeout(()=>{ try{
     : "FAIL — " + chaired + " of " + roomReq + " room-required patients took a chair");
   S.bedGrp=true; S.bedExtra=0; S.mode="split"; S.A=6; S.R=4; run();
 
+  /* 10p. THE LOAD STRETCH: OFF IS THE OLD ENGINE, AND IT IS THE DEPARTMENT'S LOAD, NOT THE LANE'S.
+          Three properties, because the second is the design decision and the third is the trap.
+          (a) At 0% the engine must be BIT-IDENTICAL to before the feature — anything else means
+              the dial cannot be turned off and every saved lane silently re-ranks.
+          (b) It must scale with the DAY, not with the lane's own occupancy. The measurement is
+              unambiguous: put the lane's occupancy and the department's in one regression and only
+              the department's survives (+2.76% t=2.47 against +1.53% t=0.98). Modelling it off the
+              lane would invent a feedback — small lane fills, service slows, fills further — that
+              exaggerates the penalty for small lanes, the direction that changes which layout
+              wins. So: holding the lane size fixed and making the DAY busier must stretch it;
+              holding the day fixed and SHRINKING the lane must not stretch it at all.
+          (c) A quiet hour must run FASTER than the reference, not just slower-at-the-peak. */
+  const evL = (A, pct, lvl) => evaluate({mode:"pooled", A, R:0, cyc:76, assess:44, assessNo:44,
+      fastDischarge:false, cc:CC.map(x=>x.i).join("."), start:15, len:8, loadPct:pct},
+      LEVELS[lvl].pts);
+  const off8 = evL(8, 0, 1).o.perArrival, on8 = evL(8, 100, 1).o.perArrival;
+  const offQ = evL(8, 0, 0).o.perArrival, offH = evL(8, 0, 3).o.perArrival;
+  const onQ  = evL(8, 100, 0).o.perArrival, onH = evL(8, 100, 3).o.perArrival;
+  /* (a) identity at zero, against a lane that never sees `load` at all */
+  const bare = sim({A:8, R:0, pooled:true, assessMin:44, assessNo:44, fastDischarge:false,
+    turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:600, seeds:[11,12,13,14]});
+  const bareOff = sim({A:8, R:0, pooled:true, assessMin:44, assessNo:44, fastDischarge:false,
+    turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:600, seeds:[11,12,13,14],
+    load: D.lam.map(()=>1)});
+  console.log("load stretch off == old engine:",
+    bare.perArrival === bareOff.perArrival && on8 > off8
+      ? "yes (a flat multiplier of 1 is bit-identical: " + bare.perArrival.toFixed(4) + ")"
+      : "FAIL — flat-1 " + bareOff.perArrival.toFixed(4) + " vs no-load " + bare.perArrival.toFixed(4)
+        + "; dial on/off " + on8.toFixed(2) + "/" + off8.toFixed(2));
+  /* (b) it follows the DAY, and shrinking the lane must not move the multiplier */
+  /* ⚠ READ THE ARRAY THE ENGINE USES, not the data it is derived from. Checking D.occ24 and
+     D.load_beta directly tests the PIPELINE and is blind to what evaluate() does with them —
+     dropping the day factor, or clamping the quiet end away, both passed that way. */
+  const lQ = evL(8, 100, 0).load, lH = evL(8, 100, 3).load, lOff = evL(8, 0, 1).load;
+  const dayEffect = Math.max(...lH) - Math.max(...lQ);
+  console.log("the stretch follows the DAY   :", dayEffect > 0.05
+    ? "yes (peak multiplier x" + Math.max(...lQ).toFixed(2) + " on a quiet day, x"
+      + Math.max(...lH).toFixed(2) + " on a heavy one)"
+    : "FAIL — quiet peak " + Math.max(...lQ).toFixed(3) + ", heavy peak " + Math.max(...lH).toFixed(3));
+  const flatOff = lOff.every(v => v === 1);
+  const sameCurve = JSON.stringify(evL(5, 100, 1).load) === JSON.stringify(evL(11, 100, 1).load);
+  console.log("  ...and NOT the lane's own load:", flatOff && sameCurve
+    ? "yes (5 and 11 spaces get the identical curve; the dial at 0 is flat)"
+    : "FAIL — " + (flatOff ? "" : "dial-0 is not flat; ") + (sameCurve ? "" : "lane size moved the curve"));
+  /* (c) quiet hours below 1, peak above — otherwise it is a flat penalty wearing a curve */
+  /* over a 24-HOUR lane, because the 15:00-23:00 default only ever sees busy hours and its
+     multiplier is above 1 all the way across — a fixture that cannot reach the quiet end cannot
+     tell a curve from a flat penalty */
+  const lT = evaluate({mode:"pooled", A:8, R:0, cyc:76, assess:44, assessNo:44,
+      fastDischarge:false, cc:CC.map(x=>x.i).join("."), start:0, len:24, loadPct:100},
+      LEVELS[1].pts).load;
+  const mLo = Math.min(...lT), mHi = Math.max(...lT);
+  console.log("quiet hours run faster        :", mLo < 0.95 && mHi > 1.05
+    ? "yes (x" + mLo.toFixed(2) + " at the quietest hour, x" + mHi.toFixed(2) + " at the busiest)"
+    : "FAIL — multiplier spans " + mLo.toFixed(3) + " to " + mHi.toFixed(3));
+
   /* 10r. THE STAGE MUST PLAY THE LANE THE CARDS SCORE. buildTrace re-lists every mode flag for
           sim(), and its own comment warns that "a mode added to sim() and not to this line plays a
           DIFFERENT lane on screen" — but only `bedFirst` and the turnover were checked. Setting
@@ -859,7 +916,7 @@ setTimeout(()=>{ try{
   const so = evaluate({mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, assessNo:S.assessNo,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
       bedcc:[...BEDPICK].sort((a,b)=>a-b).join("."), bedExtra:S.bedExtra, bedIntp:S.bedIntp,
-      bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
+      bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct, roomsA:S.roomsA,
       start:S.start, len:S.len}, LEVELS[S.level].pts).o;
   const sHtml = document.getElementById("streamBoards").innerHTML;
   /* each block is a header naming the side, then its four figures; the SECOND figure is the wait */
