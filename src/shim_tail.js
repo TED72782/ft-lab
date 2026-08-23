@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 76;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 77;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -287,8 +287,40 @@ setTimeout(()=>{ try{
     ? "yes (" + noTurn.perArrival.toFixed(2) + " -> " + wTurn.perArrival.toFixed(2)
       + " min/patient at 10/1)"
     : "FAIL — free at " + wTurn.perArrival.toFixed(2) + " vs " + noTurn.perArrival.toFixed(2));
-  console.log("zero turnover == old engine:", sim({...tb, turnA:0, turnB:0}).perArrival === noTurn.perArrival
-    ? "yes (deterministic)" : "FAIL");
+  /* ⚠ THIS COMPARED A CALL TO AN IDENTICAL CALL. `noTurn` two lines above IS
+     `sim({...tb, turnA:0, turnB:0})`, so the assertion could only ever detect nondeterminism —
+     charging a 5-minute turnover even at the zero setting, which moves every score on the page,
+     passed it. The contract it means to state is that turnover at zero is the engine as it was
+     BEFORE the feature: compare against the parameters being ABSENT, which is what a
+     pre-turnover board row carries, and pin the two together. */
+  const absentTurn = sim({...tb});
+  const zeroTurn   = sim({...tb, turnA:0, turnB:0});
+  /* ⚠ AND MEASURE THE MINUTES, NOT JUST THE ORDERING. A relative pin cannot catch a turnover
+     charged at EVERY setting — shifting both sides equally leaves absent == zero and
+     zero < charged both true while every score on the page moves. The gap between a patient
+     leaving a space and the next one entering THAT space is what "turnover" means, so read it
+     off the trace: it must equal the dial, and equal 0 when the dial is 0. Structural, so it
+     does not rot when the data cut moves. */
+  const gapAt = turnA => {
+    const t = sim({...tb, turnA, turnB:turnA, days:1, seeds:[11], trace:true}).trace || [];
+    const slotOf = new Map(); const freedAt = new Map(); let minGap = Infinity;
+    for(const e of t){
+      if(e.ev === "assess" || e.ev === "second"){
+        const key = (e.ev === "assess" ? "A" : "B") + e.slot;
+        if(freedAt.has(key)) minGap = Math.min(minGap, e.t - freedAt.get(key));
+        slotOf.set(e.id, key);
+      } else if(e.ev === "leave" && slotOf.has(e.id)){
+        freedAt.set(slotOf.get(e.id), e.t); slotOf.delete(e.id);
+      }
+    }
+    return minGap;
+  };
+  const g0 = gapAt(0), g7 = gapAt(7);
+  console.log("a space reopens after exactly:",
+    absentTurn.perArrival === zeroTurn.perArrival && g0 === 0 && g7 === 7
+      ? "yes (0 min at the zero dial, 7 at 7; absent == zero)"
+      : "FAIL — gap " + g0 + " at dial 0, " + g7 + " at dial 7; absent "
+        + absentTurn.perArrival.toFixed(3) + " vs zero " + zeroTurn.perArrival.toFixed(3));
 
   /* The sibling rule must send families to ROOMS, so it can only cost when rooms are the scarce
      side. Checked on a room-poor lane, where it has somewhere to bite. */
@@ -502,12 +534,24 @@ setTimeout(()=>{ try{
         on the first one seated it alone — 17% of pairs were still being split. */
   const held = D.grp;
   D.grp = {p2:0, p3:0, p4:1, mean_group_size:4, share:1};
-  const tooBig = sim({A:3, R:0, pooled:true, assessMin:44, fastDischarge:false, turnA:0, turnB:0,
-    lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:200, seeds:[11,12]});
+  /* ⚠ IN EVERY BRANCH THAT SEATS A PARTY. This ran `pooled:true` only, which drains through
+     takeNext — but the splitting incident lived in the bed-first/stream path, whose own
+     `if(++seated[gid] === gsz) drain(t)` is a different line of code. Reverting THAT one to the
+     original bug (drain on the first member) passed this check untouched. Three branches, three
+     fixtures. */
+  const seatBranches = [["pooled", {A:3, R:0, pooled:true}],
+                        ["bed-first", {A:3, R:0, bedFirst:true, bedShare:0.5}],
+                        ["stream", {A:3, R:0, stream:true, bedShare:1}]];
+  const split = [];
+  for(const [nm, cfg] of seatBranches){
+    const t = sim({...cfg, assessMin:44, fastDischarge:false, turnA:0, turnB:0, bedGrp:false,
+      lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:200, seeds:[11,12]});
+    if(t.seen !== 0) split.push(nm + " seated " + t.seen.toFixed(1));
+  }
   D.grp = held;
-  console.log("a party is never split     :", tooBig.seen === 0
-    ? "yes (parties of 4 never fit a lane of 3, and none is seen)"
-    : "FAIL — " + tooBig.seen.toFixed(1) + " seen per evening in a lane no party fits");
+  console.log("a party is never split     :", split.length === 0
+    ? "yes (parties of 4 never fit a lane of 3, in all three seating branches)"
+    : "FAIL — " + split.join("; ") + " per evening in a lane no party fits");
 
   /* 5. Now that the controls actually render (REAL_IDS), exercise them — the sliders exist to be
         dragged, and an oninput that throws or fails to move state is invisible otherwise. */
@@ -517,17 +561,25 @@ setTimeout(()=>{ try{
     if(!el){ ctlFail.push(id + " missing"); return }
     el.value = String(v); el.oninput && el.oninput({target:el});
     if(read() !== v) ctlFail.push(id + " -> " + read() + " (wanted " + v + ")"); };
+  /* ⚠ EVERY SLIDER, NOT JUST THE NEW ONES. This listed only the three controls added on
+     2026-08-22, so killing the assessment-time slider or the window sliders — the tool's ORIGINAL
+     controls, and the ones its central argument turns on — passed unnoticed. A check named
+     "today's controls" quietly meant "today's" in the calendar sense. */
   drag("trn", 22, () => S.turnRoom);
   drag("trc",  6, () => S.turnChair);
   drag("asn", 58, () => S.assessNo);
+  drag("asx", 61, () => S.assess);
+  drag("cyc", 88, () => S.cyc);
+  drag("wstart", 11, () => S.start);
+  drag("wlen", 9,  () => S.len);
   const tap = id => { const el = document.getElementById(id);
     if(!el){ ctlFail.push(id + " missing"); return } el.onclick && el.onclick(); };
   const intpWas = S.bedIntp, grpWas = S.bedGrp;
   tap("bedIntpBtn"); tap("bedGrpBtn");
   if(S.bedIntp === intpWas) ctlFail.push("bedIntpBtn inert");
   if(S.bedGrp  === grpWas)  ctlFail.push("bedGrpBtn inert");
-  console.log("today's controls actually run:", ctlFail.length ? "FAIL — " + ctlFail.join("; ")
-    : "yes (turnover x2, no-test assessment, interpreter, sibling)");
+  console.log("every control actually runs :", ctlFail.length ? "FAIL — " + ctlFail.join("; ")
+    : "yes (7 sliders + 2 toggles)");
   S.turnRoom=10; S.turnChair=1; S.assessNo=44; S.bedIntp=true; S.bedGrp=true;
 
   /* 6. THE BOARD AND THE PAGE MUST AGREE ON A LANE. scoreOf ran 300x3 against run()'s 600x4, so
@@ -714,6 +766,33 @@ setTimeout(()=>{ try{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10s. THE STREAM BOARDS MUST BE LABELLED THE RIGHT WAY ROUND. `the two streams can diverge`
+          reads sim()'s return directly and never the markup, so swapping streams[0]/streams[1] in
+          the rendered table survives it — and the physician then reads "Rooms 11 min / Chairs 97"
+          on a lane where it is exactly the reverse. That is the worst kind of wrong: confidently
+          precise, and backwards. Parse what is on screen and match it to the engine. */
+  S.mode="stream"; S.A=2; S.R=8; S.bedExtra=50; S.bedIntp=false; S.bedGrp=false; run();
+  const so = evaluate({mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, assessNo:S.assessNo,
+      fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
+      bedcc:[...BEDPICK].sort((a,b)=>a-b).join("."), bedExtra:S.bedExtra, bedIntp:S.bedIntp,
+      bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
+      start:S.start, len:S.len}, LEVELS[S.level].pts).o;
+  const sHtml = document.getElementById("streamBoards").innerHTML;
+  /* each block is a header naming the side, then its four figures; the SECOND figure is the wait */
+  const rows = [...sHtml.matchAll(/<div class="strm-h">([^<]*)<[\s\S]*?<b class="num">[\d.]+<\/b><span>arrive here<\/span><\/div>\s*<div><b class="num">([\d.]+)<\/b>/g)]
+      .map(m => ({side: m[1].trim(), wait: Number(m[2])}));
+  const roomRow  = rows.find(r => /room/i.test(r.side));
+  const chairRow = rows.find(r => /chair/i.test(r.side));
+  const ok = so && roomRow && chairRow
+    && Math.abs(roomRow.wait  - so.streams[1].wait) < 0.06
+    && Math.abs(chairRow.wait - so.streams[0].wait) < 0.06;
+  console.log("stream boards match their side:", ok
+    ? "yes (rooms " + roomRow.wait + " = engine " + so.streams[1].wait.toFixed(1)
+      + ", chairs " + chairRow.wait + " = " + so.streams[0].wait.toFixed(1) + ")"
+    : "FAIL — printed " + JSON.stringify(rows) + " against engine rooms "
+      + (so ? so.streams[1].wait.toFixed(1) : "?") + " / chairs " + (so ? so.streams[0].wait.toFixed(1) : "?"));
+  S.mode="split"; S.A=6; S.R=4; S.bedExtra=0; run();
+
   /* 10t. THE BLANK-IS-ABSENT BRANCH, THE DYSURIA DECISION, AND THE CACHE KEY — three one-line
           properties that each protect something already got wrong once, and none of which any
           check touched. */
