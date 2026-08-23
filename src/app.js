@@ -1857,9 +1857,23 @@ function run(){
       + "on a clock. A space that looks full is full."; }
   // keep the query string — it carries ?board=, and replacing the URL with a bare hash would
   // drop the shared board from the address bar on the first render
-  history.replaceState(null, "", location.pathname + location.search + "#" +
-    encodeURIComponent(hashState()));
+  SELF_HASH = encodeURIComponent(hashState());
+  history.replaceState(null, "", location.pathname + location.search + "#" + SELF_HASH);
 }
+
+/* ⚠ A PASTED LINK MUST LAND, even in a tab that is already open. fromHash() ran once at startup
+   and nothing listened afterwards, so a colleague's lane pasted into an open tab changed the
+   address bar and NOTHING else — the page went on showing the lane you already had, which is the
+   worst possible failure for a tool whose whole point is comparing lanes. Sharing by pasting into
+   an open tab is how these actually get passed around.
+   The guard is SELF_HASH: run() rewrites the address on every recompute, and reacting to our own
+   write would reset the lane mid-edit. Only a hash we did not write is treated as an arrival. */
+var SELF_HASH = "";   // var, not let: run() assigns it before this line is reached
+addEventListener("hashchange", () => {
+  const h = location.hash.replace(/^#/, "");
+  if(!h || h === SELF_HASH) return;
+  fromHash(); drawPresets(); drawModes(); drawSpaces(); drawWindow(); run();
+});
 
 function drawLevels(E){
   $("levels").innerHTML = LEVELS.map((l,i)=>{

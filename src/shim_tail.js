@@ -641,6 +641,33 @@ setTimeout(()=>{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10y. A PASTED LINK MUST LAND IN AN ALREADY-OPEN TAB. fromHash() ran once at startup and
+          nothing listened after, so a colleague's lane pasted into an open tab changed the address
+          bar and NOTHING else — the page kept showing the lane you already had. That is the worst
+          failure available to a tool whose entire purpose is comparing lanes, and pasting into an
+          open tab is how these get passed around. Both directions matter: a foreign hash must be
+          taken up, and the page's OWN write (run() rewrites the address on every recompute) must
+          be ignored, or the lane resets itself mid-edit. */
+  /* The "own write" arm has to be able to FAIL, and re-reading our own hash is idempotent, so
+     comparing before/after proves nothing. Park an edit in S that has NOT been written to the
+     address yet — exactly the mid-drag state — then fire our own hash back at the page. Without
+     the SELF_HASH guard that edit is clobbered by the stale address. */
+  S.mode="split"; S.A=6; S.R=4; run();
+  /* the stub's replaceState does not touch location.hash, so put the page's OWN write there by
+     hand — otherwise the handler early-returns on an empty address and the arm proves nothing */
+  location.hash = "#" + encodeURIComponent(hashState());
+  S.A = 9;                                       // an edit in flight, address not yet rewritten
+  fireEvent("hashchange");                       // the address still holds OUR OWN earlier write
+  const selfHeld = S.mode==="split" && S.A===9;
+  S.A = 6; run();
+  location.hash = "#bedfirst,3,7,76,44,1,1,15,8,,2.9,0,1,1,10,1,1,44";   // a colleague's lane
+  fireEvent("hashchange");
+  const took = S.mode==="bedfirst" && S.A===3 && S.R===7;
+  console.log("a pasted link lands         :", took && selfHeld
+    ? "yes (foreign taken up, own write ignored)"
+    : "FAIL — " + (took ? "" : "foreign link ignored: "+S.mode+" "+S.A+"/"+S.R+"; ")
+                + (selfHeld ? "" : "own write reset the lane"));
+
   /* 10z. EVERY WIRED CONTROL MUST ACTUALLY BE WIRED. Seven handlers — the complaint row, its
           room chip, the three sort buttons, the presets, chairs/rooms, the discharge rule and the
           board's own load button — were reachable by NO check: replacing all seven `onclick`
@@ -649,6 +676,7 @@ setTimeout(()=>{
           FUNCTION on every element the page renders with one, which is the part a rename or a
           refactor silently breaks. */
   S.mode="split"; S.A=6; S.R=4; run();
+  drawModes(); drawSpaces(); drawSpeed(modeOf());   // the panels, not just the numbers
   saveLocal([{who:"wired", at: 77, cfg:{mode:"split",A:6,R:4,cyc:76,assess:44,fastDischarge:true}}]);
   SHARED=false; drawBoard();
   const wired = [["[data-cc]","ccList"], ["[data-bed]","ccList"], ["[data-sort]","ccSortSeg"],

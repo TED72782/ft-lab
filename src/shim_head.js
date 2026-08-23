@@ -89,3 +89,9 @@ global.fetch=(url,opt)=>{
 
 global.requestAnimationFrame=fn=>0;
 global.cancelAnimationFrame=()=>{};
+
+/* The page listens for `hashchange` so a pasted link lands in an already-open tab. Record
+   listeners rather than ignoring them, so a guard can actually fire one. */
+const LISTENERS = {};
+function addEventListener(kind, fn){ (LISTENERS[kind] = LISTENERS[kind] || []).push(fn) }
+function fireEvent(kind){ (LISTENERS[kind] || []).forEach(fn => fn()) }
