@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 88;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 89;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -853,19 +853,34 @@ setTimeout(()=>{ try{
      calibration. Build a lane matching the pod's measured patients-per-hour and compare there. */
   const target = D.doc_lam * 9;                        // the pod's own intake over its span
   const byShare = CC.slice().sort((a, b) => b.s - a.s);
-  let bestFit = null;
+  const podLane = (docs, ids) => evaluate({mode:"pooled", A:11, R:0, cyc:76, assess:44,
+      assessNo:44, fastDischarge:false, cc:ids.join("."), start:11, len:9, loadPct:0, docs},
+      LEVELS[1].pts);
+  let bestFit = null, podIds = null;
   for(let n = 2; n <= CC.length; n++){
     const ids = byShare.slice(0, n).map(x => x.i);
-    const e = evaluate({mode:"pooled", A:11, R:0, cyc:76, assess:44, assessNo:44,
-      fastDischarge:false, cc:ids.join("."), start:11, len:9, loadPct:0, docs:1}, LEVELS[1].pts);
+    const e = podLane(1, ids);
     const err = Math.abs(e.accepted - target);
-    if(!bestFit || err < bestFit.err) bestFit = {err, q:e.o.docWait, got:e.accepted};
+    if(!bestFit || err < bestFit.err){ bestFit = {err, q:e.o.docWait, got:e.accepted}; podIds = ids }
   }
   console.log("the queue matches the measured:", Math.abs(bestFit.q - D.doc_queue_measured) < 8
     ? "yes (modelled " + bestFit.q.toFixed(1) + " min at " + bestFit.got.toFixed(1)
       + " patients/day, against a measured " + D.doc_queue_measured + " at " + target.toFixed(1) + ")"
     : "FAIL — modelled " + bestFit.q.toFixed(1) + " vs measured " + D.doc_queue_measured
       + " (at " + bestFit.got.toFixed(1) + " against " + target.toFixed(1) + " patients/day)");
+  /* ⚠ THE QUEUE MUST NOT BE COUNTED TWICE. The drawn hold ALREADY contains the real
+     roomed-to-doctor wait, so it is rescaled by the measured post-doctor share before the
+     modelled queue is added back. Drop that rescale and every space is held ~20% too long —
+     which inflates every number on the page and no other check would notice, because they all
+     compare the engine against itself. The space hold must be about the same either way. */
+  /* on the CALIBRATED lane — at three times the pod's intake one provider is genuinely
+     overloaded and the hold genuinely should grow, which is a fact about staffing and not a
+     double count */
+  const hOff = podLane(0, podIds).o.holdMean, hOn = podLane(1, podIds).o.holdMean;
+  console.log("the queue is not counted twice:", Math.abs(hOn - hOff) / hOff < 0.12
+    ? "yes (a space is held " + hOn.toFixed(1) + " min with the queue, " + hOff.toFixed(1) + " without)"
+    : "FAIL — " + hOn.toFixed(1) + " with the queue against " + hOff.toFixed(1) + " without");
+
   /* ⚠ THE POINT OF THE WHOLE THING: chairs stop buying time, providers do not. */
   const c8 = evD(8, 1, 1), c18 = evD(18, 1, 1), d2 = evD(11, 2, 1), d1 = evD(11, 1, 1);
   const chairsBuy = (c8.o.perArrival + c8.o.docWait) - (c18.o.perArrival + c18.o.docWait);

@@ -804,7 +804,7 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
    they are is a modelling decision about the real department, not a coding one, and either choice
    moves every published comparison between the layouts. It needs an operator's answer first. */
 function sim(cfg){
-  let qSum = 0, qN = 0;            // provider-queue accumulators, across every day and seed
+  let qSum = 0, qN = 0, hSum = 0, hN = 0;   // provider-queue and space-hold accumulators
   const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace} = cfg;
@@ -900,9 +900,10 @@ function sim(cfg){
         docFree[i] = start + expo(r, 1/docMin);   // expo() takes a RATE, not a mean
         qSum += start - t; qN++;
         return start - t; };
-      const holdOf = (t, w, raw) => docs
-        ? docQueue(t) + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8)
-        : raw;
+      const holdOf = (t, w, raw) => {
+        const v = docs ? docQueue(t) + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) : raw;
+        hSum += v; hN++;                 // exposed so the no-double-count property is testable
+        return v; };
       const rec = (tag,w,dv) => { const tt=w+floor; if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++;
         if(bedReq){ const b=BY[bedReq[tag]]; b.wait+=tt; b.n++; if(dv) b.div++; else b.seen++ } };
 
@@ -1123,7 +1124,7 @@ function sim(cfg){
                     divPct:0, saturated:false, idle:true, peak:0};
   const byHour=[]; for(let h=0;h<H;h++) byHour.push(hn[h] ? hs[h]/hn[h] : 0);
   const worst = Math.max.apply(null, byHour);
-  return {docWait: qN ? qSum/qN : 0, wa: waN ? wa/waN : 0, perArrival: (wa+wr+divWait)/arrN, wr: nw?wr/nw:0, stuck: nw?100*blocked/nw:0,
+  return {docWait: qN ? qSum/qN : 0, holdMean: hN ? hSum/hN : 0, wa: waN ? wa/waN : 0, perArrival: (wa+wr+divWait)/arrN, wr: nw?wr/nw:0, stuck: nw?100*blocked/nw:0,
           byHour, worst, worstIdx: byHour.indexOf(worst),
           seen: seen/runs, arrived: arrN/runs, diverted: divN/runs,
           divByHour: [...divH].map(v=>v/runs),
