@@ -248,12 +248,16 @@ function sim(cfg){
                                            if(T) T.push({t, id:q[1], ev:"divert"}) }
                        qa.length=0; if(T) T.push({t, ev:"close"}); continue }
         if(bedFirst || stream){
-          if(kind===0){ if(T) T.push({t, id:tag, ev:"arrive", test: null});
-                        /* A family needs a door: siblings go in one room together rather than
+          if(kind===0){ /* A family needs a door: siblings go in one room together rather than
                            into separate chairs across the lane, so arriving with a sibling is a
                            bed-required rule in its own right and not a share to be added. The
                            draw is kept for everyone else. */
                         bedReq[tag] = (bedGrp && gsz[tag] > 1) || r() < bedShare ? 1 : 0;
+                        /* ⚠ the flag rides along AFTER it is drawn — pushed before, it recorded
+                           the previous patient's value. It exists so the seating rule is
+                           observable from outside: a room-required patient must never end up in
+                           a chair, and nothing could see that at all before. */
+                        if(T) T.push({t, id:tag, ev:"arrive", test: null, bed: !!bedReq[tag]});
                         qa.push([t,tag]);
                         /* ⚠ WAIT FOR THE WHOLE PARTY. Each member is its own arrival event at the
                            same instant, so draining on the first one seated it alone and the
@@ -653,6 +657,11 @@ function evaluate(cfg, dayTotal){
 
   const lam = hours.map(h => D.lam24[h] * fac * share);      // what the lane actually sees
   const accepted = lam.reduce((a,b)=>a+b, 0);
+  /* Hoisted and returned so the WIRING can be asserted. `mix().fm` is the same expression, but it
+     is consumed only by buildTrace (the stage) — this copy, the one the SCORE runs on, had no
+     check at all: deleting it, or reading the wrong field here, both passed the harness while
+     narrowing the complaint list silently stopped moving the scored assessment time. */
+  const assessNoEff = (cfg.assessNo ?? cfg.assess ?? 44) * (D.g.dd ? w("dd")/D.g.dd : 1);
 
   const o = accepted < 0.05 ? {idle:true, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
                                byHour:hours.map(()=>0), diverted:0, divByHour:hours.map(()=>0),
@@ -674,7 +683,7 @@ function evaluate(cfg, dayTotal){
            /* ⚠ resolve the legacy fallback BEFORE scaling. sim() used to take `assessNo ??
               assessMin`, so a cfg without the field worked; multiplying an undefined by the mix
               factor gives NaN, and a NaN reaches the board as a blank score. */
-           assessNo: (cfg.assessNo ?? cfg.assess ?? 44) * (D.g.dd ? w("dd")/D.g.dd : 1),
+           assessNo: assessNoEff,
            asw:scale(D.asw, f*w("a")/D.g.asw), now:scale(D.now, f*w("o")/D.g.now),
            res:scale(D.res, f*w("r")/D.g.res), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
 
@@ -692,7 +701,7 @@ function evaluate(cfg, dayTotal){
   const laneMin = o.idle ? 0 : o.perArrival * accepted;
   const score = dayTotal ? (laneMin + divMin + outMin) / dayTotal : B.mean;
 
-  return {o, m, hours, accepted, share, dayTotal, score, base:B.mean, delta:B.mean-score,
+  return {o, m, hours, accepted, share, dayTotal, score, assessNoEff, base:B.mean, delta:B.mean-score,
           cover: dayTotal ? accepted/dayTotal : 0};
 }
 

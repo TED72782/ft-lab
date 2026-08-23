@@ -194,9 +194,21 @@ setTimeout(()=>{ try{
   S.bedIntp = true; run();
   const yesI = liveBedShare();
   // it must ADD to the list rather than replace it, and land inside 0..1
-  console.log("interpreter adds to the list :", yesI > noI && yesI < 1
-    ? "yes (" + (100*noI).toFixed(0) + "% -> " + (100*yesI).toFixed(0) + "%)"
-    : "FAIL — off=" + noI + " on=" + yesI);
+  /* ⚠ A DIRECTION IS NOT A COMPOSITION. `yesI > noI && yesI < 1` is satisfied by the
+     double-counting implementation too — applying the interpreter rate to the WHOLE selection
+     instead of to whoever the ticked complaints leave behind passed it, moving the printed share
+     18.20% -> 19.43%. Assert the composition itself, the way the bedExtra check already does:
+     the interpreter term applies only to the residual, so nobody is counted twice. */
+  const selI = CC.filter(x => PICK.has(x.i)), totI = selI.reduce((a,x)=>a+x.s, 0);
+  const residualI = selI.filter(x => !BEDPICK.has(x.i))
+                        .reduce((a,x) => a + x.s * x.x, 0) / (totI || 1);
+  console.log("interpreter adds to the list :",
+    yesI > noI && yesI < 1 && Math.abs(yesI - (noI + (1-noI)*residualI/(1-noI || 1))) < 5e-3
+    || (yesI > noI && yesI < 1 && Math.abs(yesI - (noI + residualI)) < 1e-9)
+    ? "yes (" + (100*noI).toFixed(1) + "% + " + (100*residualI).toFixed(1)
+      + "% of whoever is left = " + (100*yesI).toFixed(1) + "%)"
+    : "FAIL — off=" + noI.toFixed(4) + " on=" + yesI.toFixed(4)
+      + " but the residual term is " + residualI.toFixed(4));
 
   /* ⚠ NOT A FLAT RATE. If someone ever replaces the per-complaint `x` with a single window-wide
      number this check is the one that notices: narrowing to a low-interpreter complaint and to a
@@ -398,6 +410,21 @@ setTimeout(()=>{ try{
     PICK = new Set([earM.i]); const fmEar = mix().fm;
     PICK = new Set([lacM.i]); const fmLac = mix().fm;
     PICK = held;
+    /* ⚠ AND IT MUST REACH THE SCORE, NOT JUST THE ANIMATION. `mix().fm` is consumed ONLY by
+       buildTrace (the stage); the scoring path has its own copy of the same expression inside
+       evaluate. So this pinned the factor's DEFINITION and neither of its two consumers —
+       deleting the factor from evaluate, or reading the wrong field there, both passed. The
+       check's own comment claimed it pinned "where a wiring mistake would live". Score two
+       single-complaint lanes and require the scored no-test hold to move with the complaint. */
+    const effOne = m => evaluate({mode:"pooled", A:4, R:0, cyc:76, assess:44, assessNo:44,
+        fastDischarge:false, cc:String(m.i), start:15, len:8}, LEVELS[1].pts).assessNoEff;
+    const eEar = effOne(earM), eLac = effOne(lacM);
+    console.log("the doctor factor reaches the score:",
+      eLac > eEar * 1.3 && Math.abs(eEar - 44*earM.dd/D.g.dd) < 1e-9
+      ? "yes (an ear-only lane scores a " + eEar.toFixed(1) + " min assessment, laceration "
+        + eLac.toFixed(1) + ", from a 44 min dial)"
+      : "FAIL — ear " + eEar.toFixed(2) + " vs laceration " + eLac.toFixed(2)
+        + "; expected ear " + (44*earM.dd/D.g.dd).toFixed(2));
     console.log("quick complaints move sooner:", fmLac > fmEar * 1.3
       ? "yes (ear doctor-time " + Math.round(earM.dd) + " min, laceration " + Math.round(lacM.dd)
         + " — factor " + fmEar.toFixed(2) + " vs " + fmLac.toFixed(2) + ")"
@@ -766,6 +793,63 @@ setTimeout(()=>{ try{
     btn.onclick();
     sizes.push(S.A + (modeOf().hasR ? S.R : 0));
   }
+  /* 10q. A ROOM-REQUIRED PATIENT MUST NEVER GET A CHAIR. The engine sorts each arriving party so
+          its room-required members are seated first — without it, a chair-eligible sibling could
+          take the last room and push the room-required one into a chair, which is the exact rule
+          the layout exists to model (measured at 1.16% of room-required placements when it was
+          broken). Deleting the sort passed everything, and could not even be OBSERVED from
+          outside until the trace started carrying the flag. */
+  /* it is ~1% of room-required placements, so one day cannot reach it — sweep many */
+  let roomReq = 0, chaired = 0;
+  for(let sd = 1; sd <= 120; sd++){
+    const t = sim({A:3, R:8, pooled:false, bedFirst:true, bedShare:0.5, bedGrp:false,
+      assessMin:44, fastDischarge:false, turnA:0, turnB:0,
+      lam:D.lam, asw:D.asw, now:D.now, res:D.res, days:1, seeds:[sd], trace:true}).trace || [];
+    const need = new Set(t.filter(e => e.ev === "arrive" && e.bed).map(e => e.id));
+    roomReq += need.size;
+    chaired += t.filter(e => e.ev === "second" && need.has(e.id)).length;
+  }
+  console.log("room-required never gets a chair:", roomReq > 200 && chaired === 0
+    ? "yes (" + roomReq + " room-required patients over 120 days, none seated in a chair)"
+    : "FAIL — " + chaired + " of " + roomReq + " room-required patients took a chair");
+  S.bedGrp=true; S.bedExtra=0; S.mode="split"; S.A=6; S.R=4; run();
+
+  /* 10r. THE STAGE MUST PLAY THE LANE THE CARDS SCORE. buildTrace re-lists every mode flag for
+          sim(), and its own comment warns that "a mode added to sim() and not to this line plays a
+          DIFFERENT lane on screen" — but only `bedFirst` and the turnover were checked. Setting
+          `pooled:false`, `stream:false` or `bedShare:0` there all passed while the animation
+          showed a layout nobody had chosen. Each mode leaves a distinct fingerprint in the trace,
+          so assert the fingerprint rather than the flag. */
+  const fingerprint = mode => {
+    S.mode = mode; S.A = 4; S.R = 4; S.assess = 44; run(); buildTrace();
+    const seenAssess = new Set(); let bare = 0, afterAssess = 0, stuck = 0;
+    for(const e of PLAY.trace){
+      if(e.ev === "assess") seenAssess.add(e.id);
+      else if(e.ev === "second"){ seenAssess.has(e.id) ? afterAssess++ : bare++ }
+      else if(e.ev === "stuck") stuck++;
+    }
+    return {bare, afterAssess, stuck, A: PLAY.A, R: PLAY.R};
+  };
+  const fp = {split: fingerprint("split"), pooled: fingerprint("pooled"),
+              bedfirst: fingerprint("bedfirst"), stream: fingerprint("stream")};
+  const fpBad = [];
+  // split MOVES people: every second follows an assess, and there are some
+  if(!(fp.split.afterAssess > 0 && fp.split.bare === 0)) fpBad.push("split " + JSON.stringify(fp.split));
+  // pooled moves NOBODY: no second at all, and no second area
+  /* ⚠ "no second events" is NOT enough to identify pooled: dropping the flag makes it a SPLIT
+     lane with R=0, which also emits none. What separates them is that a split lane with nowhere
+     to move strands its test patients, and a pooled lane strands nobody by construction. */
+  if(!(fp.pooled.afterAssess === 0 && fp.pooled.bare === 0 && fp.pooled.R === 0
+       && fp.pooled.stuck === 0))
+    fpBad.push("pooled " + JSON.stringify(fp.pooled));
+  // bed-first and stream seat chairs straight from the queue: seconds with no preceding assess
+  for(const m of ["bedfirst", "stream"])
+    if(!(fp[m].bare > 0 && fp[m].afterAssess === 0)) fpBad.push(m + " " + JSON.stringify(fp[m]));
+  console.log("the stage plays the scored lane:", fpBad.length === 0
+    ? "yes (all four layouts leave their own fingerprint in the trace)"
+    : "FAIL — " + fpBad.join("; "));
+  S.mode = "split"; S.A = 6; S.R = 4; run();
+
   /* 10s. THE STREAM BOARDS MUST BE LABELLED THE RIGHT WAY ROUND. `the two streams can diverge`
           reads sim()'s return directly and never the markup, so swapping streams[0]/streams[1] in
           the rendered table survives it — and the physician then reads "Rooms 11 min / Chairs 97"
