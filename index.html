@@ -437,7 +437,8 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
       <div class="seg" id="ccSortSeg">
         <div class="seg-l">Order</div>
         <button type="button" data-sort="vol">by how many arrive</button>
-        <button type="button" data-sort="fast">fastest first &mdash; doctor to decision</button>
+        <button type="button" data-sort="fast">fastest &mdash; no test</button>
+        <button type="button" data-sort="fastall">fastest &mdash; all patients</button>
         <button type="button" data-sort="test">fewest tests first</button>
       </div>
       <div class="crit-list" id="ccList"></div>
@@ -2349,15 +2350,17 @@ function drawCriteria(){
     Tap a complaint to take it or leave it${BEDMODE.has(S.mode)
       ? `, and <b>room</b> to say it needs one rather than a chair` : ``}.
     <span class="dim">&ldquo;Doctor to decision&rdquo; is how long from the doctor arriving to the
-    call being made, <b>for the patients who needed no test</b> &mdash; ${Math.round(D.g.dd)} min on
-    average, ${Math.round(Math.min(...CC.filter(x=>!x.me).map(x=>x.dd)))} to
-    ${Math.round(Math.max(...CC.filter(x=>!x.me).map(x=>x.dd)))} across the complaints where enough
-    of them skipped one. The long ones are where something is DONE &mdash; a repair, a wound, a
-    treatment and a re-check. <b>It is not the moment they can move</b>: a patient can go somewhere
-    else once the assessment itself is finished, which happens inside this interval and is recorded
-    nowhere. The test rate beside it is measured on everyone, so the two describe different
-    patients on purpose &mdash; how often a test is needed, and how long it takes when one is
-    not.</span>`;
+    call being made, and it is shown <b>twice, for two different groups of patients</b>.
+    <b>Without a test</b> (${Math.round(D.g.dd)} min on average) is the clean chair case &mdash; but
+    it is a minority of most complaints, and which patients skip a test differs by complaint, so it
+    flatters some more than others. <b>Across everyone</b> (${Math.round(D.g.ddall)} min) covers
+    every patient with that complaint, but roughly half of it is time spent waiting on a result
+    rather than on the doctor. Neither is the whole answer; they are side by side so you can see
+    where they disagree. The long ones either way are where something is DONE &mdash; a repair, a
+    wound, a treatment and a re-check. <b>Neither is the moment they can move</b>: a patient can go
+    somewhere else once the assessment itself is finished, which happens inside this interval and
+    is recorded nowhere. A dash means too few patients skipped a test to measure that
+    complaint.</span>`;
   /* ⚠ ONE LIST, TWO DECISIONS. There were two complaint panels — take-or-leave, and
      needs-a-bed — over the same 26 rows, so in a bed layout you tapped the same complaint in two
      places to say two different things, and the two lists could silently disagree (the exclusion
@@ -2387,8 +2390,19 @@ function drawCriteria(){
      while the ORDER quietly asserted a value. They now sort to the end, where the dash means
      what it says. */
   const rank = (a, b) => (a.me ? 1 : 0) - (b.me ? 1 : 0) || a.dd - b.dd;
+  /* TWO POPULATIONS, TWO ORDERS, NEITHER PROMOTED. The row carries both figures because neither
+     is the honest single answer, and choosing one silently went wrong twice:
+       · `dd` is the doctor's time over the patients who needed NO test — the clean chair case,
+         but a selected minority, and the discount against their own complaint's test patients
+         runs 1.7x to 3.6x, so ranking by it partly ranks by selection intensity.
+       · `ddall` has a real value for every row, but pools both populations and roughly half of
+         it is time before the first result lands.
+     An earlier version showed one and sorted by the other, which was simply a defect. The fix for
+     two populations side by side is to name them and let the reader pick the order. */
   const order = S.ccSort === "fast"
       ? CC.slice().sort(rank)
+    : S.ccSort === "fastall"
+      ? CC.slice().sort((p, q) => p.ddall - q.ddall)
     : S.ccSort === "test"
       ? CC.slice().sort((p, q) => p.w - q.w || rank(p, q))
     : CC;
@@ -2399,8 +2413,11 @@ function drawCriteria(){
         <span class="cc-n">${x.n}</span>
         <span class="cc-m"><b class="num">${(pts*x.s).toFixed(1)}</b> arrive while you are open
           · <span class="num">${Math.round(100*x.w)}%</span> need a test
-          · doctor to decision, no test <span class="num">${x.me ? "&mdash;" : Math.round(x.dd)}</span>${
-            x.me ? `<span class="dim"> (too few without a test)</span>` : ` min`}</span></button>${
+          <br>doctor to decision · <span class="num">${x.me ? "&mdash;" : Math.round(x.dd)}</span>${
+            x.me ? `<span class="dim"> without a test (too few to measure)</span>`
+                 : ` min <span class="dim">without a test</span>`}
+          · <span class="num">${Math.round(x.ddall)}</span> min <span class="dim">across everyone</span>
+          </span></button>${
       bedMode ? `<button type="button" class="cc-bed" data-bed="${x.i}" aria-pressed="${bed}"
           title="${bed ? "needs a room — tap to allow a chair" : "can use a chair — tap to require a room"}"
           ${on ? `` : `disabled`}>room</button>` : ``}</div>`;

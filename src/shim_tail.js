@@ -573,15 +573,34 @@ setTimeout(()=>{
   /* measured rows only — the unmeasured ones now sort to the end by rule (see 10w), so the
      underlying dd sequence is ascending WITHIN the measured group, not across the whole list */
   const ddSeq = idsByFast.map(i => CC.find(x=>x.i===Number(i))).filter(x=>!x.me).map(x=>x.dd);
-  // the PRINTED numbers, not just the underlying field — that gap is what the bug was.
-  const shown = [...document.getElementById("ccList").innerHTML
-      .matchAll(/doctor to decision, no test <span class="num">([^<]+)</g)]
-      .map(m => m[1]).filter(v => /^\d+$/.test(v)).map(Number);
-  console.log("fast order matches the column:",
-    ddSeq.every((v,k) => k===0 || ddSeq[k-1] <= v + 1e-9)
-    && shown.length > 10 && shown.every((v,k) => k===0 || shown[k-1] <= v)
-      ? "yes (" + shown[0] + " to " + shown[shown.length-1] + " min printed, no-test)"
-      : "FAIL — order and column disagree (" + shown.join(",") + ")");
+  /* the PRINTED numbers, not just the underlying field — that gap is what the bug was. The row
+     now carries BOTH populations, so each order is checked against its OWN column, and each is
+     checked NOT to be sorted by the other one (which is the defect this replaced). */
+  const printed = () => {
+    const h = document.getElementById("ccList").innerHTML;
+    const noTest = [...h.matchAll(/doctor to decision · <span class="num">([^<]+)</g)].map(m=>m[1]);
+    const every  = [...h.matchAll(/· <span class="num">(\d+)<\/span> min <span class="dim">across everyone/g)]
+                     .map(m=>Number(m[1]));
+    return {noTest: noTest.filter(v=>/^\d+$/.test(v)).map(Number), every};
+  };
+  const asc = a => a.every((v,k) => k===0 || a[k-1] <= v);
+  const A1 = printed();
+  console.log("no-test order reads ascending:",
+    ddSeq.every((v,k) => k===0 || ddSeq[k-1] <= v + 1e-9) && A1.noTest.length > 10 && asc(A1.noTest)
+      ? "yes (" + A1.noTest[0] + " to " + A1.noTest[A1.noTest.length-1] + " min printed)"
+      : "FAIL — order and column disagree (" + A1.noTest.join(",") + ")");
+  console.log("  ...and is NOT the other order:", !asc(A1.every)
+      ? "yes (the all-patient column is unsorted here, as it must be)"
+      : "FAIL — sorting by no-test also sorted the all-patient column; check which field is used");
+  S.ccSort = "fastall"; run();
+  const A2 = printed();
+  console.log("all-patient order reads too  :", A2.every.length > 20 && asc(A2.every)
+      ? "yes (" + A2.every[0] + " to " + A2.every[A2.every.length-1] + " min printed, every row)"
+      : "FAIL — " + A2.every.join(","));
+  console.log("  ...and is NOT the other one :", !asc(A2.noTest)
+      ? "yes (the no-test column is unsorted here)"
+      : "FAIL — the two orders are indistinguishable, so one of them is not doing what it says");
+  S.ccSort = "fast"; run();
   /* the third ordering: fewest tests first. `w` is measured on EVERY arrival, unlike `dd`, so
      nothing sinks here — and a check that it does not, because sinking would hide exactly the
      test-heavy complaints this ordering exists to surface. */
