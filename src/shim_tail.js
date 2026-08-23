@@ -55,11 +55,18 @@ setTimeout(()=>{ try{
      across frames. Rebuild it every tick and the .22s arrival animation restarts from
      opacity:0 sixty times a second: the boxes change colour and the people never appear. */
   S.A=6;S.R=4;S.assess=44; run(); buildTrace();
-  PLAY.t=300; drawStage();
+  /* ⚠ PICK A QUIET MINUTE, DO NOT HARDCODE ONE. This sampled t=300 and t=300.4 and demanded the
+     occupants be unchanged — but whether anything happens in that 0.4 min is a property of the
+     trace, so any engine change can put a real departure there and the check fails for a correct
+     reason. Find a minute with no event in the following fraction and test THAT. */
+  let qt = 300;
+  for(let t=120; t<400; t++)
+    if(!PLAY.trace.some(e => e.t > t && e.t <= t+0.4)){ qt = t; break }
+  PLAY.t=qt; drawStage();
   const host=document.getElementById("stageA");
   const before=host.children.map(c=>c);
   const keys=before.map(c=>c.dataset.k).join(",");
-  PLAY.t=300.4; drawStage();   // a fraction of a minute later — same occupants
+  PLAY.t=qt+0.4; drawStage();   // a fraction of a minute later, with nothing happening in between
   const after=host.children.map(c=>c);
   const same=before.filter((c,i)=>c===after[i]).length;
   console.log("occupants unchanged             :", keys===after.map(c=>c.dataset.k).join(",") ? "yes" : "FAIL — occupants changed between frames");
@@ -103,7 +110,7 @@ setTimeout(()=>{ try{
               : "FAIL — got "+S.start+"/"+S.len);
   const live = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,
                          fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
-                         start:S.start, len:S.len, bar:S.bar, loadPct:S.loadPct},
+                         start:S.start, len:S.len, bar:S.bar, loadPct:S.loadPct, docs:S.docs},
                         LEVELS[S.level].pts).score;
   console.log("loaded lane reproduces score:", Math.abs(live-rowScore) < 1.5
               ? "yes ("+live.toFixed(1)+" vs "+rowScore.toFixed(1)+")"
@@ -168,7 +175,10 @@ setTimeout(()=>{ try{
   const liveBed = evaluate({mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
       bedcc:[...BEDPICK].sort((a,b)=>a-b).join("."), bedExtra:S.bedExtra,
-      start:S.start, len:S.len, bar:S.bar}, LEVELS[S.level].pts).score;
+      start:S.start, len:S.len, bar:S.bar,
+      /* the loaded row is a LEGACY one: it carries neither field, so sane() scored it with both
+         off, and the live lane must be evaluated the same way or the two legitimately differ */
+      loadPct:S.loadPct, docs:S.docs}, LEVELS[S.level].pts).score;
   console.log("loaded bed lane scores same :", Math.abs(liveBed-bedRowScore) < 1.5
       ? "yes ("+liveBed.toFixed(1)+" vs "+bedRowScore.toFixed(1)+")"
       : "FAIL — "+liveBed.toFixed(1)+" vs "+bedRowScore.toFixed(1));
@@ -509,7 +519,7 @@ setTimeout(()=>{ try{
       BEDPICK = new Set([2,9]);
       const want = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
         fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
-        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair, loadPct:S.loadPct,
+        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair, loadPct:S.loadPct, docs:S.docs,
         roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
       location.hash = encodeURIComponent(hashState());
       /* ⚠ SCRAMBLE EVERY FIELD, NOT A CHOSEN FEW. This wiped only assessNo, the two turnover
@@ -525,7 +535,7 @@ setTimeout(()=>{ try{
       fromHash();
       const got = {mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
         fd:S.fastDischarge,start:S.start,len:S.len,level:S.level,bedExtra:S.bedExtra,
-        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair, loadPct:S.loadPct,
+        bedIntp:S.bedIntp,bedGrp:S.bedGrp,turnRoom:S.turnRoom,turnChair:S.turnChair, loadPct:S.loadPct, docs:S.docs,
         roomsA:S.roomsA,pick:[...PICK].sort((a,b)=>a-b).join("."),bed:[...BEDPICK].sort((a,b)=>a-b).join(".")};
       for(const k of Object.keys(want))
         if(String(want[k]) !== String(got[k]) && !rtFail)
@@ -618,11 +628,11 @@ setTimeout(()=>{ try{
   PICK = new Set(CC.map(x=>x.i)); run();
   const heroScore = evaluate({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start,
-      len:S.len, bar:S.bar, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct}, LEVELS[S.level].pts).score;
+      len:S.len, bar:S.bar, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct, docs:S.docs}, LEVELS[S.level].pts).score;
   const t0 = Date.now();
   const boardScore = scoreOf({mode:S.mode,A:S.A,R:S.R,cyc:S.cyc,assess:S.assess,assessNo:S.assessNo,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."), start:S.start,
-      len:S.len, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct}, LEVELS[S.level].pts).score;
+      len:S.len, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct, docs:S.docs}, LEVELS[S.level].pts).score;
   const ms = Date.now() - t0;
   console.log("board scores what the page does:", Math.abs(heroScore - boardScore) < 1e-9
     ? "yes (" + heroScore.toFixed(2) + " both, " + ms + "ms a row)"
@@ -916,7 +926,7 @@ setTimeout(()=>{ try{
   const so = evaluate({mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, assessNo:S.assessNo,
       fastDischarge:S.fastDischarge, cc:[...PICK].sort((a,b)=>a-b).join("."),
       bedcc:[...BEDPICK].sort((a,b)=>a-b).join("."), bedExtra:S.bedExtra, bedIntp:S.bedIntp,
-      bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct, roomsA:S.roomsA,
+      bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, loadPct:S.loadPct, docs:S.docs, roomsA:S.roomsA,
       start:S.start, len:S.len}, LEVELS[S.level].pts).o;
   const sHtml = document.getElementById("streamBoards").innerHTML;
   /* each block is a header naming the side, then its four figures; the SECOND figure is the wait */

@@ -44,7 +44,8 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
    they are is a modelling decision about the real department, not a coding one, and either choice
    moves every published comparison between the layouts. It needs an operator's answer first. */
 function sim(cfg){
-  const {A, R, lam, asw, now, res, load, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
+  let qSum = 0, qN = 0;            // provider-queue accumulators, across every day and seed
+  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace} = cfg;
   // `trace` records one evening, patient by patient, so the animation plays the SAME run the
@@ -111,6 +112,32 @@ function sim(cfg){
          nowhere to move to. That total IS the physician's concurrent load. Capacity is A+R;
          the peak is what the lane actually reached, which is the honest number to show. */
       const hb = t => Math.min(H-1, (t/60)|0);
+      /* ── THE PROVIDER QUEUE ────────────────────────────────────────────────────────────────
+         A space is not care. Taking a chair puts a patient in line for a PERSON, and that line is
+         what the department's wait is actually made of: 0 of 746 patients in the current pod era
+         were seated with every chair full, yet the median one waited 22 min for a space and 8 more
+         to be seen. What predicts being seen late is how many were roomed AHEAD of you (+9.9% per
+         patient in the previous 30 min, t=3.5); the standing lane occupancy does nothing (+1.7%,
+         t=0.48); and patients roomed AFTER you carry -8.6% (t=-2.8), so being early in a burst
+         gets you seen sooner. That is FIFO for a server.
+         ⚠ ONE SERVER, NO PREEMPTION, and that is measured rather than assumed: patients roomed in
+         the 30 min after you were seen do NOT slow your ongoing care (+1.4%, t=0.88, bounded below
+         ~5%/patient). The contention is at the front door of care, not during it — so there is no
+         shared-attention penalty here, and adding one would be inventing a mechanism.
+         The drawn hold already CONTAINS the real queue, so it is scaled by the measured
+         post-doctor share before the modelled queue is added back; otherwise the wait is counted
+         twice. `docs = 0` skips all of it and the engine is exactly as it was. */
+      const docFree = new Array(docs).fill(0);
+      const docQueue = t => {
+        if(!docs) return 0;
+        let i = 0; for(let j = 1; j < docFree.length; j++) if(docFree[j] < docFree[i]) i = j;
+        const start = Math.max(t, docFree[i]);
+        docFree[i] = start + docMin;
+        qSum += start - t; qN++;
+        return start - t; };
+      const holdOf = (t, w, raw) => docs
+        ? docQueue(t) + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8)
+        : raw;
       const rec = (tag,w,dv) => { const tt=w+floor; if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++;
         if(bedReq){ const b=BY[bedReq[tag]]; b.wait+=tt; b.n++; if(dv) b.div++; else b.seen++ } };
 
@@ -128,7 +155,7 @@ function sim(cfg){
            would exaggerate the penalty for small lanes — the direction that changes which layout
            wins. `load` is 1 everywhere when the dial is off, and the engine is then identical. */
         const lf = load ? load[hb(t)] : 1;
-        const total = (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf;
+        const total = holdOf(t, w, (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf);
         if(pooled){ second[tag]=0; ev.push([t+total,1,tag]); return }
         if(!w && !fastDischarge){ second[tag]=0; ev.push([t+total,1,tag]); return }
         /* ⚠ THE TWO HALVES ARE ASSESSED SEPARATELY. `assessMin` is measured on patients who HAD
@@ -202,7 +229,7 @@ function sim(cfg){
       const draw = (tag, t) => { const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
         const lf = load ? load[hb(t)] : 1;
-        return (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf };
+        return holdOf(t, w, (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf) };
       const startBed = (t,tag) => { ab++;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         second[tag]=0; ev.push([t+draw(tag,t),1,tag]) };
@@ -331,7 +358,7 @@ function sim(cfg){
                     divPct:0, saturated:false, idle:true, peak:0};
   const byHour=[]; for(let h=0;h<H;h++) byHour.push(hn[h] ? hs[h]/hn[h] : 0);
   const worst = Math.max.apply(null, byHour);
-  return {wa: waN ? wa/waN : 0, perArrival: (wa+wr+divWait)/arrN, wr: nw?wr/nw:0, stuck: nw?100*blocked/nw:0,
+  return {docWait: qN ? qSum/qN : 0, wa: waN ? wa/waN : 0, perArrival: (wa+wr+divWait)/arrN, wr: nw?wr/nw:0, stuck: nw?100*blocked/nw:0,
           byHour, worst, worstIdx: byHour.indexOf(worst),
           seen: seen/runs, arrived: arrN/runs, diverted: divN/runs,
           divByHour: [...divH].map(v=>v/runs),
@@ -371,6 +398,7 @@ function buildTrace(){
      screen from the one the cards describe, which is worse than showing no lane at all. */
   const base = {A:S.A, R:m.hasR?S.R:0, pooled:m.id==="pooled", bedGrp:S.bedGrp, ...turnFor(S),
                 bedFirst:m.id==="bedfirst", stream:m.id==="stream", bedShare:liveBedShare(), assessMin:S.assess,
+                docs:S.docs, docMin:D.doc_min ?? 18, postShare:D.postdoc_share,
                 assessNo:S.assessNo * mx.fm,
                 fastDischarge:S.fastDischarge, shr:mx.shr, lam,
                 asw:scale(D.asw, f*mx.fa), now:scale(D.now, f*mx.fo), res:scale(D.res, f*mx.fr),
@@ -690,7 +718,7 @@ function evaluate(cfg, dayTotal){
         Math.exp(loadK * D.load_beta * (D.occ24[h % 24] * fac - D.occ_ref)))))
     : null;
 
-  const o = accepted < 0.05 ? {idle:true, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
+  const o = accepted < 0.05 ? {idle:true, docWait:0, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
                                byHour:hours.map(()=>0), diverted:0, divByHour:hours.map(()=>0),
                                arrived:0, seen:0, divPct:0}
     : sim({A:cfg.A, R:m.hasR?cfg.R:0, pooled:cfg.mode==="pooled", bedGrp:cfg.bedGrp, ...turnFor(cfg),
@@ -711,7 +739,7 @@ function evaluate(cfg, dayTotal){
               assessMin`, so a cfg without the field worked; multiplying an undefined by the mix
               factor gives NaN, and a NaN reaches the board as a blank score. */
            assessNo: assessNoEff,
-           load,
+           load, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
            asw:scale(D.asw, f*w("a")/D.g.asw), now:scale(D.now, f*w("o")/D.g.now),
            res:scale(D.res, f*w("r")/D.g.res), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
 
@@ -882,7 +910,7 @@ const LEVELS = [
 // as acceptable is a judgement for the room, not a line in a chart.
 const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
            fastDischarge:false, level:1, bar:"today", start:15, len:8, bedExtra:0, bedIntp:true,
-           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, ccSort:"vol",
+           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, docs:1, ccSort:"vol",
            /* ⚠ AN ASSUMPTION, AND IT HAS TO BE. It was briefly set to 67 — roomed -> DECISION —
               on the reading that a no-test patient can only leave the assessment space once the
               call is made. Operator, 2026-08-22: they can move as soon as the ASSESSMENT is done,
@@ -900,7 +928,7 @@ const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
    RangeError, which happened before a single button was wired, so Add / Play / Copy link were
    all inert. Limits mirror the sliders, so a clamped link lands somewhere the UI can show. */
 const LIM = {A:[1,30], R:[0,16], cyc:[55,115], assess:[10,90], assessNo:[10,120],
-             start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15], loadPct:[0,200]};
+             start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15], loadPct:[0,200], docs:[0,4]};
 /* ⚠ ONE PLACE DECIDES WHAT A LAYOUT CAN HOLD. A divided lane splits across two sliders (14+16)
    while a pooled one has a single slider, so the same estate is not representable the same way —
    and the mode switch used to resolve that by DISCARDING the difference. It refits instead: the
@@ -1084,6 +1112,17 @@ function drawTurn(){
          <label for="ldk">How much a busy department slows everything</label>
          <output class="num" id="ldkOut"></output></div>
        <input type="range" id="ldk" min="0" max="200" step="10" value="${S.loadPct}"></div>
+       <div class="ctl"><div class="ctl-top">
+         <label for="dcs">Providers covering the lane</label>
+         <output class="num" id="dcsOut"></output></div>
+       <input type="range" id="dcs" min="0" max="4" step="1" value="${S.docs}"></div>
+       <div class="hint"><b>A space is not care.</b> Taking a chair puts a patient in line for a
+         person, and that line is most of what they wait: in the current pod <b>not one patient in
+         746</b> was seated with every chair full, yet the middle one still waited
+         <b>{{docqm}} minutes</b> to be seen. What predicts being seen late is how many were roomed
+         <i>ahead</i> of you; how full the lane is predicts nothing. Each provider is modelled at
+         <b>{{docmin}} minutes</b> a patient, worked back from that queue rather than assumed.
+         <b>0 removes the queue</b> and scores spaces alone, as this page did before.</div>
        <div class="hint">Holds are measurably longer when the department is full &mdash; about
          <b>2.7% per extra patient</b> in the building, which is half again as long at a busy hour
          as at a quiet one. It is the <b>department's</b> load, not this lane's: put both in the
@@ -1094,6 +1133,7 @@ function drawTurn(){
     $("trn").oninput = e => { S.turnRoom  = +e.target.value; syncTurn(); requestRun() };
     $("trc").oninput = e => { S.turnChair = +e.target.value; syncTurn(); requestRun() };
     $("ldk").oninput = e => { S.loadPct   = +e.target.value; syncTurn(); requestRun() };
+    $("dcs").oninput = e => { S.docs      = +e.target.value; syncTurn(); requestRun() };
   }
   syncTurn();
 }
@@ -1105,6 +1145,9 @@ function syncTurn(){
   const y=$("trc"); if(y && +y.value !== S.turnChair) y.value = S.turnChair;
   const c=$("ldkOut"); if(c) c.textContent = S.loadPct + "%";
   const z=$("ldk"); if(z && +z.value !== S.loadPct) z.value = S.loadPct;
+  const d=$("dcsOut"); if(d) d.textContent = S.docs === 0 ? "none — spaces only"
+    : S.docs + (S.docs === 1 ? " provider" : " providers");
+  const q=$("dcs"); if(q && +q.value !== S.docs) q.value = S.docs;
 }
 
 function drawSpeed(m){
@@ -1371,6 +1414,8 @@ function sane(cfg){
              being scored without it — defaulting to 100 would silently re-rank other people's
              lanes under an effect they never chose. New rows always carry the field. */
           loadPct: lim("loadPct", cfg.loadPct, 0),
+          /* a row saved before the provider queue existed was scored without it — same rule */
+          docs: lim("docs", cfg.docs, 0),
           bedcc: cfg.bedcc ?? undefined, bedExtra: lim("bedExtra", cfg.bedExtra, 0),
           /* A row saved before the interpreter criterion existed was scored without it, so it
              must keep being scored without it — defaulting to true would silently re-rank other
@@ -1548,6 +1593,7 @@ function hashState(){
   c.push(S.roomsA ? "1" : "0");                                                // 16
   c.push(String(S.assessNo));                                                  // 17
   c.push(String(S.loadPct));                                                   // 18
+  c.push(String(S.docs));                                                      // 19
   return c.join(",");
 }
 function toHash(){
@@ -1598,6 +1644,7 @@ function fromHash(){
   const at = (i, dflt) => p.length > i && p[i] !== "" ? p[i] : dflt;
   /* a link written before the load stretch existed was scored without it — see sane() */
   S.loadPct = lim("loadPct", at(18, 0), 0);
+  S.docs    = lim("docs",    at(19, 0), 0);
   /* ⚠ an empty criteria field means EVERY complaint, so it must RESET PICK, not leave it. A link
      is a full setting, like a preset — landing on an unnarrowed link while narrowed kept the old
      narrowing and scored a lane the link did not describe. */
@@ -1887,7 +1934,7 @@ function run(){
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
                bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
-               loadPct:S.loadPct, assessNo:S.assessNo,
+               loadPct:S.loadPct, docs:S.docs, assessNo:S.assessNo,
                cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len, bar:S.bar};
   const E = evaluate(cfg, lvl.pts), o = E.o;
   drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
@@ -2032,7 +2079,7 @@ function run(){
   const critKey = `${S.start}|${S.len}|${S.level}|${[...PICK].sort((x,y)=>x-y).join(".")}`
     + `|${S.mode}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.ccSort}`;
   if(critKey !== lastCritKey){ lastCritKey = critKey; drawCriteria() }
-  const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}|${S.loadPct}`;
+  const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}|${S.loadPct}|${S.docs}`;
   if(bedKey !== lastBedKey){ lastBedKey = bedKey; drawBedList() }
   const boardKey = `${S.level}|${S.bar}`;
   if(boardKey !== lastBoardKey){ lastBoardKey = boardKey; drawBoard() }
