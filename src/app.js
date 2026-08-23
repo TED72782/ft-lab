@@ -44,7 +44,7 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
    they are is a modelling decision about the real department, not a coding one, and either choice
    moves every published comparison between the layouts. It needs an operator's answer first. */
 function sim(cfg){
-  const {A, R, lam, asw, now, res, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
+  const {A, R, lam, asw, now, res, load, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace} = cfg;
   // `trace` records one evening, patient by patient, so the animation plays the SAME run the
@@ -118,7 +118,17 @@ function sim(cfg){
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        const total = w ? pick(r,asw)+pick(r,res) : pick(r,now);
+        /* ⚠ SERVICE TIMES STRETCH WHEN THE DEPARTMENT IS BUSY, and the load is the DEPARTMENT's,
+           not this lane's. Measured within date x hour x test-status cells: log(hold) rises
+           +2.7% per extra patient present at rooming (t=3.8), x1.50 from the 10th to the 90th
+           percentile of occupancy. Put the lane's own occupancy in the same regression and only
+           the department's survives (+2.76% t=2.47 against the lane's +1.53% t=0.98), so this is
+           an EXOGENOUS multiplier and deliberately NOT a feedback: a fuller lane does not slow
+           itself down. Modelling it the other way would invent a loop the data does not show and
+           would exaggerate the penalty for small lanes — the direction that changes which layout
+           wins. `load` is 1 everywhere when the dial is off, and the engine is then identical. */
+        const lf = load ? load[hb(t)] : 1;
+        const total = (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf;
         if(pooled){ second[tag]=0; ev.push([t+total,1,tag]); return }
         if(!w && !fastDischarge){ second[tag]=0; ev.push([t+total,1,tag]); return }
         /* ⚠ THE TWO HALVES ARE ASSESSED SEPARATELY. `assessMin` is measured on patients who HAD
@@ -127,7 +137,10 @@ function sim(cfg){
            of an assessment for someone with no order, so the no-test half is its own control.
            Measured 2026-08-22 on a 6+4 lane: the score runs 70.0 -> 21.0 across the range, which is
            an order of magnitude more than the gaps between the layouts this page compares. */
-        const a = Math.min((w ? assessMin : (assessNo ?? assessMin)) ?? D.g.asw, total-1);
+        /* the assessment point stretches with the hold, so the two phases keep their proportions;
+           ⚠ the phase SPLIT of the stretch is not separately verified — assessment and
+           results-waiting are scaled alike because the coefficient was fitted on the whole hold */
+        const a = Math.min(((w ? assessMin : (assessNo ?? assessMin)) ?? D.g.asw) * lf, total-1);
         second[tag] = Math.max(1, total-a);
         ev.push([t+a,1,tag]) };
       const startB = (t,tag) => { rb++;
@@ -182,15 +195,20 @@ function sim(cfg){
          and that is the whole of the difference. Set the bed-required share to zero and this
          collapses onto the pooled lane with A+R spaces — which is the right sanity
          check, and also the honest statement of what the constraint costs. */
-      const draw = tag => { const w = r()<shr;
+      /* ⚠ THE LOAD STRETCH APPLIES IN BOTH ARRIVAL BRANCHES. It went into the split/pooled one
+         first and not here, and the bed-first-at-0%-equals-pooled invariant caught it immediately
+         (29.71 against 34.08) — the two branches are meant to be the same lane under a rule that
+         is inert at zero, so anything applied to one and not the other separates them. */
+      const draw = (tag, t) => { const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        return w ? pick(r,asw)+pick(r,res) : pick(r,now) };
+        const lf = load ? load[hb(t)] : 1;
+        return (w ? pick(r,asw)+pick(r,res) : pick(r,now)) * lf };
       const startBed = (t,tag) => { ab++;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
-        second[tag]=0; ev.push([t+draw(tag),1,tag]) };
+        second[tag]=0; ev.push([t+draw(tag,t),1,tag]) };
       const startChair = (t,tag) => { rb++;
         if(T){ const s=freeB.pop(); slotB[tag]=s; T.push({t, id:tag, ev:"second", slot:s}) }
-        ev.push([t+draw(tag),2,tag]) };
+        ev.push([t+draw(tag,t),2,tag]) };
       /* Same one-party rule as the split lane. A party needs room for ALL of it before any of it
          is placed: enough doors for its bed-required members, and any space at all for the rest. */
       const party = g => { const out=[]; for(let j=0;j<qa.length;j++) if(gid[qa[j][1]]===g) out.push(j); return out };
@@ -662,6 +680,15 @@ function evaluate(cfg, dayTotal){
      check at all: deleting it, or reading the wrong field here, both passed the harness while
      narrowing the complaint list silently stopped moving the scored assessment time. */
   const assessNoEff = (cfg.assessNo ?? cfg.assess ?? 44) * (D.g.dd ? w("dd")/D.g.dd : 1);
+  /* The department's own occupancy curve, scaled by how busy the chosen day is, turned into a
+     per-hour service-time multiplier. `loadK` is the reader's dial: 0 reproduces the engine
+     exactly as it was, 1 is the effect as measured. Clamped because the exponential runs away on
+     a heavy day at the peak hour and no measurement supports extrapolating that far. */
+  const loadK = cfg.loadK ?? 1;
+  const load = (D.occ24 && D.load_beta)
+    ? hours.map(h => Math.max(0.6, Math.min(1.8,
+        Math.exp(loadK * D.load_beta * (D.occ24[h % 24] * fac - D.occ_ref)))))
+    : null;
 
   const o = accepted < 0.05 ? {idle:true, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
                                byHour:hours.map(()=>0), diverted:0, divByHour:hours.map(()=>0),
@@ -684,6 +711,7 @@ function evaluate(cfg, dayTotal){
               assessMin`, so a cfg without the field worked; multiplying an undefined by the mix
               factor gives NaN, and a NaN reaches the board as a blank score. */
            assessNo: assessNoEff,
+           load,
            asw:scale(D.asw, f*w("a")/D.g.asw), now:scale(D.now, f*w("o")/D.g.now),
            res:scale(D.res, f*w("r")/D.g.res), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
 
