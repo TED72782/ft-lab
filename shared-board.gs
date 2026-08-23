@@ -35,6 +35,8 @@ function sheet_() {
   } else if (sh.getLastColumn() < HEAD.length) {
     sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]);   // widen a board written by v1
   }
+  // ⚠ freeze the header so a Sheets sort cannot carry it into the data — see read_()
+  if (sh.getFrozenRows() < 1) sh.setFrozenRows(1);
   return sh;
 }
 
@@ -46,9 +48,17 @@ function json_(obj) {
 function read_() {
   var rows = sheet_().getDataRange().getValues();
   var out = [];
-  for (var i = 1; i < rows.length; i++) {
+  /* ⚠ SKIP THE HEADER BY CONTENT, NOT BY POSITION. This started at i=1 unconditionally while the
+     file's own instructions invite the operator to "sort or annotate freely" — and a Sheets A-Z
+     sort with no frozen row carries the header down with the data. The row that lands in
+     position 0 is then eaten as a header (that physician's lane disappears) and the real header
+     appears as a lane named "who", which sane() clamps into a plausible 6+4 split and enters in
+     the ranking. sheet_() freezes row 1 now so Sheets excludes it from a sort; this is the
+     belt to that pair of braces. */
+  for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     if (!r[0]) continue;
+    if (String(r[0]) === 'who' && String(r[1]) === 'mode') continue;
     while (r.length < HEAD.length) r.push('');   // a narrower legacy sheet reads short
     out.push({
       who: String(r[0]).slice(0, 28),
@@ -127,7 +137,14 @@ function doPost(e) {
         sh.deleteRow(i + 1);
       }
     }
-    sh.appendRow([who, String(c.mode), Number(c.A) || 0, Number(c.R) || 0,
+    /* ⚠ TEXT-FORCE `who` LIKE cc AND bedcc. It is free text from the same untrusted source and
+       went in unprotected, so the Sheet coerced it: "007" is stored as the number 7, and the
+       dedup key compares String(cell) === who, so "7" !== "007" and every re-post appended
+       ANOTHER row — the board filling with identical lanes under a name nobody typed. "0" is
+       worse: read_() skips a row whose first cell is falsy, so that physician's lane vanishes
+       entirely. The apostrophe also stops a leading = being taken as a formula by whoever opens
+       the sheet. Sheets strips the marker on read, so nothing changes on the way back. */
+    sh.appendRow(["'" + who, String(c.mode), Number(c.A) || 0, Number(c.R) || 0,
                   Number(c.cyc) || 0, Number(c.assess) || 0, c.fastDischarge === true,
                   Number(b.at) || Date.now(),
                   /* ⚠ '' AND "none" ARE DIFFERENT LANES. read_() maps a blank cell back to

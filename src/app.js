@@ -1219,6 +1219,14 @@ const DEFAULT_BOARD = "https://script.google.com/macros/s/AKfycbx91tZp5wYvxwMoGJ
    exactly the name cap the Apps Script enforces — so it survives intact and runs for everyone who
    opens the leaderboard. The board URL gets forwarded around a department, so one row reaches
    every reader and can rewrite the scores they are deciding on. */
+/* ⚠ A HUNG REQUEST IS THE LIKELIEST FAILURE, AND IT WAS THE ONE NOT HANDLED. Both fetches
+   degrade carefully on a COMPLETED failure — probe falls back to the local board, a failed push
+   keeps the lane in this browser and says so. Neither had a timeout, so an Apps Script cold
+   start, a sleeping LAN host or a captive portal completes never: the shared-board tag stays
+   blank so nobody is told which board they are on, and Add appears to do nothing, for ever, with
+   no message and no fallback — while the code to say exactly that sits one line away. */
+const timeout = ms => { const a = new AbortController(); setTimeout(() => a.abort(), ms); return a.signal };
+
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -1251,7 +1259,7 @@ async function probeShared(explicit){
   API = explicit === undefined ? endpointFromEnv() : (explicit || null);
   if(!API) return markShared();
   try{
-    const r = await fetch(API, {cache:"no-store", redirect:"follow"});
+    const r = await fetch(API, {cache:"no-store", redirect:"follow", signal: timeout(8000)});
     if(!r.ok) throw 0;
     const d = await r.json();
     if(!Array.isArray(d)) throw 0;
@@ -1271,7 +1279,8 @@ async function pushShared(entry){
   try{
     // text/plain deliberately: a JSON content-type makes the browser send a CORS preflight,
     // which an Apps Script web app cannot answer, and the POST would fail before arriving.
-    const r = await fetch(API, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
+    const r = await fetch(API, {signal: timeout(12000),
+      method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
                                 body: JSON.stringify(entry), redirect:"follow"});
     if(!r.ok) return false;
     const d = await r.json();

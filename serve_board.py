@@ -13,7 +13,7 @@ to the internet, which matters on a laptop that holds clinical data.
 
 The board lives in board.json next to this file. Delete it to reset.
 """
-import json, socket, sys
+import json, os, threading, socket, sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -28,6 +28,23 @@ def read():
         return json.loads(BOARD.read_text())
     except Exception:
         return []
+
+
+_WRITE_LOCK = threading.Lock()
+
+
+def _atomic_write(rows):
+    """Write via a temp file and os.replace.
+
+    ⚠ write_text TRUNCATES FIRST. Interrupt it — Ctrl-C, sleep, a full disk — and board.json is
+    half a JSON document, which read()'s bare except turns into an empty board: every layout in
+    the room vanishes with no message anywhere, and the next successful post makes the loss
+    permanent. os.replace is atomic on POSIX, so a reader sees either the old board or the new
+    one and never a torn one.
+    """
+    tmp = BOARD.with_suffix(".tmp")
+    tmp.write_text(json.dumps(rows, indent=1))
+    os.replace(tmp, BOARD)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -93,10 +110,19 @@ class Handler(SimpleHTTPRequestHandler):
                     "turnRoom": c.get("turnRoom"), "turnChair": c.get("turnChair"),
                     "roomsA": c.get("roomsA"), "assessNo": c.get("assessNo")}
             here = lane(entry["cfg"])
-            board = [x for x in read()
-                     if not (x.get("who") == entry["who"] and lane(x.get("cfg")) == here)]
-            board.append(entry)
-            BOARD.write_text(json.dumps(board[-MAX_ENTRIES:], indent=1))
+            # ⚠ ONE WRITER AT A TIME. ThreadingHTTPServer runs handlers concurrently and this
+            # read-modify-write was unguarded, so two physicians adding at the same moment left
+            # ONE lane on the board — reproducibly, 6 runs out of 6. Worse than silent: the
+            # response is built from the in-memory list, which contains the losing poster's row,
+            # so their page shows their lane ranked and it is simply not in the file. It
+            # disappears on the next reload with no error. "Everyone add yours now" is exactly
+            # how this gets used in a room. shared-board.gs already takes a LockService lock for
+            # this reason; this file had no equivalent.
+            with _WRITE_LOCK:
+              board = [x for x in read()
+                       if not (x.get("who") == entry["who"] and lane(x.get("cfg")) == here)]
+              board.append(entry)
+              _atomic_write(board[-MAX_ENTRIES:])
             return self._json(board)
         except Exception:
             return self.send_error(400)

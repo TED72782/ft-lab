@@ -1,4 +1,5 @@
 const rows = [];
+let frozen = 0;   // the fake sheet must model the frozen header, or sheet_() throws
 /* ⚠ A SHEET PARSES WHAT IT IS HANDED. appendRow('0.10') does not store the string "0.10" — it
    stores the NUMBER 0.1, and reading it back gives "0.1". The first version of this fake kept
    whatever it was given, so it could never see the criteria ids being eaten. A leading
@@ -12,6 +13,7 @@ const sheet = {
   appendRow: r => rows.push(r.map(asCell)),
   getDataRange: () => ({ getValues: () => rows.map(r => { const c=r.slice(); while(c.length<11)c.push(''); return c }) }),
   getLastColumn: () => rows.length ? rows[0].length : 0,
+  getFrozenRows: () => frozen, setFrozenRows: n => { frozen = n },
   getRange: (a,b,c,d) => ({ setValues: v => { rows[0] = v[0].slice() } }),
   deleteRow: i => rows.splice(i-1,1),
 };
@@ -107,3 +109,56 @@ console.log('stream mode accepted          :', streamRow && streamRow.cfg.mode==
   ? 'yes (' + streamRow.cfg.A + ' beds + ' + streamRow.cfg.R + ' chairs)' : 'FAIL');
 const rej = doPost({postData:{contents:JSON.stringify({who:'X',cfg:{mode:'zone',A:2,R:8},at:1})}});
 console.log('retired mode rejected         :', String(rej).indexOf('error')>=0 ? 'yes' : 'FAIL got '+rej);
+
+/* ⚠ THE HIGHEST-VALUE GAP THE MUTATION AUDIT FOUND. A legacy row must read `assessNo` as
+   UNDEFINED so the page falls it back to `assess`; if it read 0, lim() sees a finite number and
+   clamps to the slider MINIMUM of 10 — scoring a legacy lane at a 10-minute assessment instead of
+   44. There were fixtures asserting that contract for the turnover and bed fields, and none for
+   assessNo, bedGrp or roomsA. */
+rows.length = 0; frozen = 0;
+rows.push(HEAD.slice(0, 7));                       // a v1 sheet: no assessNo/bedGrp/roomsA columns
+rows.push(['Legacy2', 'split', 6, 4, 76, 44, true]);
+const lg = read_()[0].cfg;
+console.log('legacy row has no assessNo    :',
+  lg.assessNo === undefined && lg.bedGrp === undefined && lg.roomsA === undefined
+    ? 'yes (all three absent, so the page can fall them back)'
+    : 'FAIL — assessNo=' + JSON.stringify(lg.assessNo) + ' bedGrp=' + JSON.stringify(lg.bedGrp)
+      + ' roomsA=' + JSON.stringify(lg.roomsA));
+
+/* bedcc needs the text marker for the same reason cc does, and only cc had a fixture for it:
+   "2.10" is a NUMBER to a spreadsheet, stored as 2.1, and the trailing complaint is simply gone. */
+rows.length = 0; frozen = 0; rows.push(HEAD.slice());
+doPost({postData:{contents: JSON.stringify({who:'Digits', at:1,
+  cfg:{mode:'split', A:6, R:4, cyc:76, assess:44, fastDischarge:true, cc:'2.10', bedcc:'2.10'}})}});
+const kept = read_()[0].cfg;
+console.log('bedcc keeps its trailing digit:', kept.cc === '2.10' && kept.bedcc === '2.10'
+  ? 'yes (both survive the sheet as text)'
+  : 'FAIL — cc=' + JSON.stringify(kept.cc) + ' bedcc=' + JSON.stringify(kept.bedcc));
+
+/* and the header must survive being sorted into the data — the file invites operators to sort */
+rows.length = 0; frozen = 0; rows.push(HEAD.slice());
+doPost({postData:{contents: JSON.stringify({who:'Alvarez', at:1,
+  cfg:{mode:'split', A:6, R:4, cyc:76, assess:44, fastDischarge:true}})}});
+rows.sort((a, b) => String(a[0]) < String(b[0]) ? -1 : 1);        // an A-Z sort, header included
+const sorted = read_();
+console.log('a sorted sheet keeps its lanes:',
+  sorted.length === 1 && sorted[0].who === 'Alvarez'
+    ? 'yes (header skipped by content, not by position)'
+    : 'FAIL — ' + JSON.stringify(sorted.map(r => r.who)));
+
+/* ⚠ `who` IS FREE TEXT HANDED TO A SPREADSHEET. Unprotected, "007" is stored as the number 7 and
+   the dedup key compares String(cell) === who, so "7" !== "007" and every re-post appends another
+   row — the board filling with duplicate lanes under a name nobody typed. "0" is worse: read_()
+   skips a row whose first cell is falsy, so that physician's lane vanishes outright. */
+const numericNames = [];
+for (const nm of ['007', '0', '42']) {
+  rows.length = 0; frozen = 0; rows.push(HEAD.slice());
+  const cfg = {mode:'split', A:6, R:4, cyc:76, assess:44, fastDischarge:true};
+  doPost({postData:{contents: JSON.stringify({who:nm, at:1, cfg})}});
+  doPost({postData:{contents: JSON.stringify({who:nm, at:2, cfg})}});   // same lane again
+  const back = read_();
+  if (!(back.length === 1 && back[0].who === nm)) numericNames.push(nm + ' -> ' + JSON.stringify(back.map(r => r.who)));
+}
+console.log('a numeric name still dedups   :', numericNames.length === 0
+  ? 'yes ("007", "0" and "42" each keep one row under their own name)'
+  : 'FAIL — ' + numericNames.join('; '));
