@@ -66,6 +66,15 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .opt .t{font-weight:600;font-size:14px}
 .opt .s{font-size:12.5px;color:var(--ink-2)}
 #presets button{background:var(--surface)}
+.strm{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;
+  background:var(--surface)}
+.strm-h{font-size:13px;font-weight:600;margin-bottom:8px}
+.strm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.strm-row div{display:flex;flex-direction:column;gap:2px}
+.strm-row b{font-size:20px;line-height:1.1}
+.strm-row span{font-size:11.5px;color:var(--ink-2);line-height:1.3}
+.strm-note{font-size:12px;color:var(--ink-2);margin-top:8px}
+@media(max-width:720px){.strm-row{grid-template-columns:repeat(2,1fr)}}
 .slot.turn{background:repeating-linear-gradient(45deg,transparent,transparent 3px,
   var(--line) 3px,var(--line) 5px);border-style:dashed}
 .cc-row{display:flex;align-items:center;gap:6px}

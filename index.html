@@ -66,6 +66,15 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .opt .t{font-weight:600;font-size:14px}
 .opt .s{font-size:12.5px;color:var(--ink-2)}
 #presets button{background:var(--surface)}
+.strm{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;
+  background:var(--surface)}
+.strm-h{font-size:13px;font-weight:600;margin-bottom:8px}
+.strm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.strm-row div{display:flex;flex-direction:column;gap:2px}
+.strm-row b{font-size:20px;line-height:1.1}
+.strm-row span{font-size:11.5px;color:var(--ink-2);line-height:1.3}
+.strm-note{font-size:12px;color:var(--ink-2);margin-top:8px}
+@media(max-width:720px){.strm-row{grid-template-columns:repeat(2,1fr)}}
 .slot.turn{background:repeating-linear-gradient(45deg,transparent,transparent 3px,
   var(--line) 3px,var(--line) 5px);border-style:dashed}
 .cc-row{display:flex;align-items:center;gap:6px}
@@ -337,6 +346,7 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
   <!-- ── results ──────────────────────────────────────────── -->
   <div>
     <div class="hero" id="hero"></div>
+    <div id="streamBoards"></div>
     <div class="load" id="load"></div>
     <div class="barbar"><span id="barNote"></span></div>
 
@@ -745,6 +755,12 @@ function sim(cfg){
   if(T){ for(let i=A-1;i>=0;i--) freeA.push(i); for(let i=R-1;i>=0;i--) freeB.push(i) }
   const H = lam.length, CLOSE = H*60;
   let wa=0, waN=0, wr=0, wrN=0, blocked=0, nw=0, seen=0, arrN=0, divN=0, divWait=0, peakSum=0;
+  /* ⚠ TWO STREAMS NEED TWO SETS OF NUMBERS. In `stream` the pools never lend to each other, so a
+     single average hides the whole point — a jammed chair side and an idle bed side average to
+     something that describes neither. Accumulated for every bed-shaped layout, reported only
+     where the split is real. Keyed on bedReq, which IS the routing decision. */
+  const BY = [{n:0, wait:0, seen:0, div:0, peak:0},    // 0 = chair side
+              {n:0, wait:0, seen:0, div:0, peak:0}];   // 1 = bed side
   const hs=new Float64Array(H), hn=new Float64Array(H), divH=new Float64Array(H);
 
   for(const sd of seeds){
@@ -789,13 +805,14 @@ function sim(cfg){
       const bedReq = (bedFirst || stream) ? new Uint8Array(arr.length) : null;
       const slotA = T ? new Int16Array(arr.length).fill(-1) : null;
       const slotB = T ? new Int16Array(arr.length).fill(-1) : null;
-      let ab=0, rb=0, peak=0;
+      let ab=0, rb=0, peak=0, pkA=0, pkB=0;
       const seated = new Int32Array(gnext);      // members of each party that have arrived
       /* ab+rb is every patient occupying a space — including one stuck in assessment with
          nowhere to move to. That total IS the physician's concurrent load. Capacity is A+R;
          the peak is what the lane actually reached, which is the honest number to show. */
       const hb = t => Math.min(H-1, (t/60)|0);
-      const rec = (tag,w,dv) => { const tt=w+floor; if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++ };
+      const rec = (tag,w,dv) => { const tt=w+floor; if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++;
+        if(bedReq){ const b=BY[bedReq[tag]]; b.wait+=tt; b.n++; if(dv) b.div++; else b.seen++ } };
 
       const startA = (t,tag) => { ab++;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
@@ -932,6 +949,8 @@ function sim(cfg){
                  else        { rb--; if(T){ freeB.push(slotB[tag]); T.push({t, id:tag, ev:"free"}) } }
                  drain(t) }
           if(ab+rb > peak) peak = ab+rb;
+          if(ab > pkA) pkA = ab;
+          if(rb > pkB) pkB = rb;
           continue;
         }
         if(kind===0){ if(T) T.push({t, id:tag, ev:"arrive", test: null});
@@ -961,7 +980,7 @@ function sim(cfg){
         }
         if(ab+rb > peak) peak = ab+rb;
       }
-      peakSum += peak;
+      peakSum += peak; BY[1].peak += pkA; BY[0].peak += pkB;
     }
   }
   if(T) return {trace:T, A, R};
@@ -976,7 +995,12 @@ function sim(cfg){
           seen: seen/runs, arrived: arrN/runs, diverted: divN/runs,
           divByHour: [...divH].map(v=>v/runs),
           divPct: 100*divN/arrN, saturated: divN/arrN > 0.02,
-          peak: peakSum/runs};
+          peak: peakSum/runs,
+          /* one entry per stream: chairs then beds. `wait` is per patient routed to that side,
+             INCLUDING the ones it never seated — same convention as the lane-wide figure. */
+          streams: BY.map(b => ({share: arrN ? b.n/arrN : 0, n: b.n/runs,
+                                 wait: b.n ? b.wait/b.n : 0,
+                                 seen: b.seen/runs, diverted: b.div/runs, peak: b.peak/runs}))};
 }
 
 /* ── playing one evening ──────────────────────────────────────────────────────
@@ -1294,7 +1318,7 @@ function evaluate(cfg, dayTotal){
                                byHour:hours.map(()=>0), diverted:0, divByHour:hours.map(()=>0),
                                arrived:0, seen:0, divPct:0}
     : sim({A:cfg.A, R:m.hasR?cfg.R:0, pooled:cfg.mode==="pooled", bedGrp:cfg.bedGrp, ...turnFor(cfg),
-           bedFirst:cfg.mode==="bedfirst",
+           bedFirst:cfg.mode==="bedfirst", stream:cfg.mode==="stream",
            // a row saved during the brief flat-share build carries one number and no list
            bedShare: cfg.bedcc === undefined && cfg.bedShare !== undefined
              ? Math.min(1, Math.max(0, (+cfg.bedShare || 0) / 100))
@@ -2307,6 +2331,16 @@ function run(){
     if(br > 0) sides.push({n:"rooms", spaces:S.A, coming: E.accepted*br,
                 thing:"rooms, for the patients who cannot be put in a chair",
                 load: E.accepted*br*hold/(S.A*mins), cap: S.A*mins/hold});
+  } else if(m.id==="stream"){
+    /* TWO POOLS, TWO LOADS, AND NEITHER RELIEVES THE OTHER. Streaming is the one layout where
+       "the estate" is not a meaningful denominator: each side sees only its own share of the
+       arrivals and only its own spaces, so they are sized independently and the worse one is
+       named. It also read "assessment spaces" here, which is not what a stream lane has. */
+    const hold = D.hold_all*fPace, br = liveBedShare();
+    sides.push({n:"beds", spaces:S.A, thing:"beds", coming: E.accepted*br,
+                load: br ? E.accepted*br*hold/(S.A*mins) : 0, cap: S.A*mins/hold});
+    sides.push({n:"chairs", spaces:S.R, thing:"chairs", coming: E.accepted*(1-br),
+                load: E.accepted*(1-br)*hold/(S.R*mins), cap: S.R*mins/hold});
   } else {
     sides.push({n:"assessment", spaces:S.A, thing:"assessment spaces", coming: E.accepted,
                 load: E.accepted*perAssess/(S.A*mins), cap: S.A*mins/perAssess});
@@ -2331,6 +2365,27 @@ function run(){
          That is not <b class="num">${(bind.spaces-busy).toFixed(1)}</b> going spare — patients
          arrive in clusters, so people start waiting well before every one is taken.`;
   }
+
+  /* ⚠ TWO BOARDS FOR TWO STREAMS. With pools that never lend to each other, one row of averages
+     describes neither side: the whole point of the layout is that one can jam while the other
+     idles, and that is exactly what an average erases. The lane-wide score stays — it is what the
+     board ranks on and what charges the patients the lane turns away — and each side then gets
+     its own line. Only in `stream`; bed-first is a preference, not a partition, so its pools are
+     not separate queues and splitting them would invent a distinction the model does not make. */
+  const twoStream = m.id === "stream" && o.streams && !o.idle;
+  $("streamBoards").innerHTML = !twoStream ? `` : [
+    ["Beds",   o.streams[1], S.A, "sorted to a bed"],
+    ["Chairs", o.streams[0], S.R, "everyone else"]
+  ].map(([name, st, spaces, who]) => `<div class="strm">
+      <div class="strm-h">${name} <span class="dim">· ${spaces} space${spaces===1?"":"s"} · ${who}</span></div>
+      <div class="strm-row">
+        <div><b class="num">${st.n.toFixed(1)}</b><span>arrive here</span></div>
+        <div><b class="num ${st.wait > 60 ? "is-breach" : ""}">${st.wait.toFixed(1)}</b><span>min each, waiting for a space</span></div>
+        <div><b class="num ${st.diverted > 1 ? "is-breach" : ""}">${st.diverted.toFixed(1)}</b><span>still waiting at close</span></div>
+        <div><b class="num">${st.peak.toFixed(1)}</b><span>at once at its busiest, of ${spaces}</span></div>
+      </div></div>`).join("")
+    + `<div class="strm-note">Neither side lends to the other, so these are two queues, not one.
+       A side that is idle while the other is jammed is the arrangement, not a rounding error.</div>`;
 
   $("hero").innerHTML = [
     [`${E.score.toFixed(1)}`, `minutes per ESI 4/5 patient arriving that day, lower is better —

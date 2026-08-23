@@ -494,6 +494,27 @@ setTimeout(()=>{
     : "FAIL — no slot ever shows the turnover state");
   S.turnRoom=10; S.turnChair=1;
 
+  /* 8. TWO STREAMS, TWO BOARDS. The reason they exist is that the sides can diverge, so the check
+        is that they DO — and that they still reconcile to the lane, or the boards are decorative. */
+  const sq = sim({A:2, R:8, pooled:false, stream:true, bedShare:0.5, bedGrp:false, assessMin:44,
+    fastDischarge:false, turnA:0, turnB:0, lam:D.lam, asw:D.asw, now:D.now, res:D.res,
+    days:1200, seeds:[11,12,13,14]});
+  const bed = sq.streams[1], chair = sq.streams[0];
+  console.log("the two streams can diverge :", bed.wait > chair.wait * 2
+    ? "yes (2 beds carry " + bed.wait.toFixed(0) + " min each, 8 chairs " + chair.wait.toFixed(0) + ")"
+    : "FAIL — a 2-bed/8-chair lane at a 50% split reads " + bed.wait.toFixed(1)
+      + " vs " + chair.wait.toFixed(1) + "; the sides are not being separated");
+  const nSum = bed.n + chair.n, divSum = bed.diverted + chair.diverted;
+  console.log("the boards reconcile        :",
+    Math.abs(nSum - sq.arrived) < 0.05 && Math.abs(divSum - sq.diverted) < 0.05
+      ? "yes (arrivals and diversions add back to the lane)"
+      : "FAIL — n " + nSum.toFixed(2) + " vs " + sq.arrived.toFixed(2)
+        + ", diverted " + divSum.toFixed(2) + " vs " + sq.diverted.toFixed(2));
+  /* and nobody may be sent to a side that has no spaces for them */
+  console.log("a stream keeps its own share:", Math.abs(bed.share - 0.5) < 0.03
+    ? "yes (" + (100*bed.share).toFixed(0) + "% routed to beds, as set)"
+    : "FAIL — " + (100*bed.share).toFixed(1) + "% routed to beds against a 50% rule");
+
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 
   console.log("\nsample markup:", A.slice(A.indexOf("<span class=\"slot full"), A.indexOf("<span class=\"slot full")+230).replace(/\s+/g," "));
