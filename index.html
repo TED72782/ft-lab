@@ -1528,8 +1528,12 @@ function evaluate(cfg, dayTotal){
   /* ⚠ DELAY ONLY — IT FLOORS AT 1. Measured from the QUIETEST hour, not the average: centred on
      the mean it dipped below 1, which would say an empty department makes the lane FASTER than
      its own baseline. Crowding can add delay; its absence is the floor, not a bonus.
-     ⚠ AND IT IS NOT THE PROVIDER. The lane has a DEDICATED doctor 11:00-21:00 (operator,
-     2026-08-23) and inside those hours the effect is undiminished: +8.1% per patient (t=3.87)
+     ⚠ AND IT IS NOT THE PROVIDER. The lane has its OWN provider — a physician 11:00-20:00,
+     sometimes an APP later, with rooming stopping around 19:00 (operator, 2026-08-23) — and
+     inside those hours the effect is undiminished. Re-measured on each candidate window once the
+     hours were corrected (bolus-controlled, department occupancy -> log time-to-be-seen):
+     all hours +8.9%/pt (t=2.80) · 11:00-20:00 +9.0% (t=2.44) · 11:00-19:00 +10.4% (t=2.72) ·
+     11:00-23:00 +10.6% (t=3.24). It does not shrink inside dedicated cover; if anything it grows
      with the lane's own load controlled at 30 min, at 2 h, and by its standing occupancy. So the
      shared resource is something else — nursing and room preparation are the candidates, and a
      documentation-timing artefact cannot be excluded. It is applied to the service time because
@@ -1951,9 +1955,10 @@ function drawTurn(){
          before the doctor arrives (+15% per extra patient in the building); the time from the
          doctor arriving to the patient leaving moves <b>+0.5%, which is nothing</b>. Crowding does
          not slow care, it delays its start.
-         <b>&#9888; It is not the doctor being pulled away.</b> This lane has a dedicated provider
-         from 11:00 to 21:00, and inside those hours the effect is undiminished (+8% per patient,
-         even after allowing for how busy the lane itself is). So something else shared with the
+         <b>&#9888; It is not the doctor being pulled away.</b> This lane has its own provider
+         &mdash; a physician from 11:00 to 20:00, sometimes an APP later &mdash; and inside those
+         hours the effect is undiminished (+9% per patient, even after allowing for how busy the
+         lane itself is). So something else shared with the
          department &mdash; nursing and room preparation are the obvious candidates, and
          documentation timing cannot be ruled out &mdash; is what actually delays the start. This
          dial reproduces that delay; it does not explain it. 100% is what today measures, 0 removes
