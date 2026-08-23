@@ -162,3 +162,25 @@ for (const nm of ['007', '0', '42']) {
 console.log('a numeric name still dedups   :', numericNames.length === 0
   ? 'yes ("007", "0" and "42" each keep one row under their own name)'
   : 'FAIL — ' + numericNames.join('; '));
+
+/* ⚠ ONE FIXTURE PER KEY FIELD. The dedup key is a CONJUNCTION, so dropping one term only collides
+   if some fixture PAIR differs in exactly that term — and only bedIntp had such a pair. Dropping
+   bedGrp, turnRoom, turnChair, roomsA or assessNo from the key gave 0 FAILs, meaning a physician
+   who re-saves a lane after changing only the turnover dial silently overwrites their earlier
+   entry instead of adding a second row. Each field below is varied ALONE against a common base. */
+const BASE = {mode:'split', A:6, R:4, cyc:76, assess:44, fastDischarge:true,
+              cc:'1.2', bedcc:'2', bedExtra:7, bedIntp:false, bedGrp:false,
+              turnRoom:10, turnChair:1, roomsA:false, assessNo:44, start:15, len:8};
+const unpinned = [];
+for (const [f, alt] of [['A',9],['R',7],['cyc',90],['assess',70],['assessNo',58],['bedExtra',22],
+                        ['bedIntp',true],['bedGrp',true],['turnRoom',25],['turnChair',6],
+                        ['roomsA',true],['start',9],['len',13],['cc','1.3'],['bedcc','3'],
+                        ['fastDischarge',false],['mode','pooled']]) {
+  rows.length = 0; frozen = 0; rows.push(HEAD.slice());
+  doPost({postData:{contents: JSON.stringify({who:'Key', at:1, cfg:BASE})}});
+  doPost({postData:{contents: JSON.stringify({who:'Key', at:2, cfg:{...BASE, [f]: alt}})}});
+  if (read_().length !== 2) unpinned.push(f);
+}
+console.log('every scored field keys the row:', unpinned.length === 0
+  ? 'yes (17 fields, each varied alone, each makes a distinct row)'
+  : 'FAIL — changing these did NOT create a new row: ' + unpinned.join(', '));
