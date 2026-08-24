@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 99;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 100;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1449,6 +1449,30 @@ setTimeout(()=>{ try{
         ? "yes (none at 0; " + num(m) + " provider-min at today's, " + num(h) + " at twice)"
         : "FAIL — z=\"" + z.slice(0,40) + "\" m=" + num(m) + " h=" + num(h));
     S.loadPct = 100;
+  }
+  {
+    /* the dial keeps working where it works, and SAYS SO where it does not. Trimming the range
+       to 150 was proposed on a miscount (peak taken over all 24 hours, day-scaling dropped) and
+       rejected: on a typical day nothing caps even at 150. */
+    const lv = S.level; S.level = 1; S.start = 15; S.len = 8;
+    S.loadPct = 150; const typ150 = loadEffect();
+    S.loadPct = 170; const typ170 = loadEffect();
+    S.loadPct = 200; const typ200 = loadEffect();
+    S.level = LEVELS.length - 1;
+    S.loadPct = 150; const hvy150 = loadEffect();
+    /* ⚠ the two branches must be told APART. Checking only for the word "ceiling" let a
+       mutation that deletes the every-hour branch pass, because the partial branch says
+       "ceiling" too. Assert the PARTIAL count and the TOTAL wording separately. */
+    const partial = /(\d+) of your 8 open hours are already at the model's ceiling/.exec(typ170);
+    console.log("the crowding dial owns up when its ceiling binds:",
+      !/ceiling/.test(typ150) && partial && +partial[1] > 0 && +partial[1] < 8
+        && /Every hour you are open is already at the model's ceiling/.test(typ200)
+        && /ceiling/.test(hvy150)
+        ? "yes (typical silent at 150, " + partial[1] + "/8 at 170, every hour at 200;"
+          + " heavy day capped at 150)"
+        : "FAIL — t150 " + /ceiling/.test(typ150) + " t170 \"" + typ170.slice(-46)
+          + "\" t200every " + /Every hour/.test(typ200) + " heavy150 " + /ceiling/.test(hvy150));
+    S.level = lv; S.loadPct = 100;
   }
   S.mode="split"; S.A=6; S.R=4; S.cyc=Math.round(D.T_A);
 

@@ -1224,17 +1224,28 @@ function loadText(){
 function loadEffect(){
   if(!D.occ24 || !D.load_beta || !D.doc_min) return "";
   const fac = LEVELS[S.level].pts / D.day_mean, base = D.occ_floor ?? D.occ_ref;
-  let mult = 1, peak = S.start;
+  let mult = 1, peak = S.start, capped = 0;
   for(let i = 0; i < S.len; i++){
     const h = (S.start + i) % 24;
     const v = Math.max(1, Math.min(2.2,
       Math.exp((S.loadPct/100) * D.load_beta * (D.occ24[h]*fac - base))));
     if(v > mult){ mult = v; peak = h }
+    if(v >= 2.199) capped++;
   }
   if(mult <= 1.005) return "At this setting a busy department adds nothing at any hour you are open.";
-  return "At this setting the busiest hour you are open is " + String(peak).padStart(2,"0")
+  let txt = "At this setting the busiest hour you are open is " + String(peak).padStart(2,"0")
     + ":00, where one patient takes " + (D.doc_min*mult).toFixed(0)
     + " of the provider's minutes against " + (+D.doc_min).toFixed(0) + " in the quiet hours.";
+  /* ⚠ SAY WHEN THE DIAL HAS STOPPED BITING. The multiplier is capped at 2.2 — the model will
+     not extrapolate a measured exponential far past the occupancy it was fitted on — so on a
+     busy enough day the top of this slider moves nothing, and silently. Trimming the range was
+     considered and rejected: on a TYPICAL day nothing is capped even at 150, and 150->200 is
+     still worth 2.6-4.4 min of score, so the travel is real and only the ceiling is not. */
+  if(capped >= S.len) txt += " Every hour you are open is already at the model's ceiling, so"
+    + " pushing this further changes nothing.";
+  else if(capped > 0) txt += " " + capped + " of your " + S.len
+    + " open hours are already at the model's ceiling.";
+  return txt;
 }
 
 function syncTurn(){
