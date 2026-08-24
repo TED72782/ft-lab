@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 100;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 107;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1475,6 +1475,101 @@ setTimeout(()=>{ try{
     S.level = lv; S.loadPct = 100;
   }
   S.mode="split"; S.A=6; S.R=4; S.cyc=Math.round(D.T_A);
+
+
+  /* ── the provider ceiling (2026-08-23) ────────────────────────────────────────────────── */
+  {
+    const mk = (mode,A,R,cap) => sim({A,R,pooled:mode==="pooled",bedFirst:mode==="bedfirst",
+      stream:mode==="stream",bedGrp:false,bedShare:0.5,assessMin:44,assessNo:44,
+      fastDischarge:false,shr:D.shr,lam:Array.from({length:12},(_,i)=>D.lam24[(14+i)%24]),
+      asw:D.asw,now:D.now,res:D.res,docs:1,docMin:D.doc_min,postShare:D.postdoc_share,
+      floorRoom:D.floor_room,days:250,seeds:[11,12],capPerDoc:cap});
+    /* INERT AT 0. Every knob in this engine has to leave it bit-identical when unset —
+       otherwise it is not a new option, it is a silent change to everyone's saved lanes. */
+    let same = true;
+    for(const m of ["split","pooled","bedfirst","stream"]){
+      const a = mk(m,10,4,0), b = mk(m,10,4,0);
+      if(a.perArrival !== b.perArrival) same = false;
+    }
+    const off = mk("split",10,4,0), huge = mk("split",10,4,999);
+    console.log("the provider ceiling is inert when unset:",
+      same && off.perArrival === huge.perArrival
+        ? "yes (0 and a ceiling far above the lane give the identical run)"
+        : "FAIL — off " + off.perArrival.toFixed(3) + " vs unreachable-ceiling " + huge.perArrival.toFixed(3));
+
+    /* IT BINDS — and on ALL FOUR layouts. The engine has two separate admission paths
+       (takeOne for split/pooled, takeParty for bed-first/stream) and a knob wired into one of
+       them is the recurring bug in this file: the page then says one thing and scores another
+       for half the layouts. */
+    const unbound = [];
+    for(const m of ["split","pooled","bedfirst","stream"]){
+      const capped = mk(m,10,4,3);
+      if(capped.peakLoad > 3.01) unbound.push(m + " load " + capped.peakLoad.toFixed(1));
+    }
+    console.log("the ceiling binds on every layout, not just one admission path:",
+      unbound.length === 0
+        ? "yes (cap 3 holds the patient load <= 3 in split, pooled, bed-first and stream)"
+        : "FAIL — not enforced: " + unbound.join(", "));
+    /* ⚠ AND `peak` IS A DIFFERENT QUANTITY — spaces in use, which during a split's move counts
+       one patient in two places while the assessment space turns over. It may legitimately sit
+       ABOVE the ceiling, and only in a layout that moves people. Pinned, because the obvious
+       "fix" is to cap `peak` instead, and that would silently shrink every split lane. */
+    const sp = mk("split",10,4,3), po = mk("pooled",10,4,3);
+    /* ⚠ AND THE CEILING MUST BE REACHED, not merely respected. Capping spaces-in-use instead of
+       patients also keeps the load under the ceiling — by admitting FEWER patients than the
+       ceiling allows, which is a quieter wrong answer than exceeding it. In a layout that moves
+       people the two differ, so assert the split lane actually fills its allowance. */
+    console.log("the ceiling is used up, not under-spent:",
+      sp.peakLoad >= 2.95
+        ? "yes (cap 3, split carries " + sp.peakLoad.toFixed(2) + ")"
+        : "FAIL — cap 3 but split only reaches " + sp.peakLoad.toFixed(2)
+          + " (is it capping spaces rather than patients?)");
+    console.log("spaces-in-use and patient load are kept distinct:",
+      sp.peak > sp.peakLoad && Math.abs(po.peak - po.peakLoad) < 0.01
+        ? "yes (split spaces " + sp.peak.toFixed(1) + " vs load " + sp.peakLoad.toFixed(1)
+          + "; pooled, which never moves anyone, identical at " + po.peak.toFixed(1) + ")"
+        : "FAIL — split " + sp.peak.toFixed(1) + "/" + sp.peakLoad.toFixed(1)
+          + " pooled " + po.peak.toFixed(1) + "/" + po.peakLoad.toFixed(1));
+
+    /* AND IT COSTS WHAT IT SHOULD. Lowering the ceiling must lengthen the wait — patients are
+       held outside instead of taken on. A cap that lowered load AND wait would mean the engine
+       was discarding patients rather than queueing them. */
+    const loose = mk("pooled",14,0,0), tight = mk("pooled",14,0,4);
+    console.log("a lower ceiling trades wait for load, it does not conjure both:",
+      tight.peak < loose.peak && tight.perArrival > loose.perArrival
+        ? "yes (peak " + loose.peak.toFixed(1) + "->" + tight.peak.toFixed(1)
+          + ", wait " + loose.perArrival.toFixed(1) + "->" + tight.perArrival.toFixed(1) + ")"
+        : "FAIL — peak " + loose.peak.toFixed(1) + "->" + tight.peak.toFixed(1)
+          + ", wait " + loose.perArrival.toFixed(1) + "->" + tight.perArrival.toFixed(1));
+  }
+  {
+    /* it is a SCORED field, so the link must carry it — the failure mode is a shared lane that
+       scores differently for the person who receives it */
+    const keep = S.capPerDoc;
+    S.capPerDoc = 7; const h = hashState();
+    S.capPerDoc = 0; location.hash = "#" + h; fromHash();
+    console.log("the ceiling survives a shared link:",
+      S.capPerDoc === 7 ? "yes (7 out, 7 back)" : "FAIL — 7 out, " + S.capPerDoc + " back");
+    S.capPerDoc = keep; location.hash = "";
+  }
+
+  {
+    /* the CONTROL, not just the engine — drive it the way a physician does and read what the
+       page shows. A knob whose engine works and whose label lies is still a broken knob. */
+    S.mode="pooled"; S.A=14; S.R=0; S.start=14; S.len=10; S.docs=1;
+    PICK=new Set(CC.map(x=>x.i));
+    S.capPerDoc=0; run(); const off = $("cpdOut").textContent, offEff = $("cpdEff").textContent;
+    S.capPerDoc=6; run(); const on  = $("cpdOut").textContent, onEff  = $("cpdEff").textContent;
+    S.docs=2;      run(); const two = $("cpdOut").textContent;
+    console.log("the ceiling control reads in patients and reports what the lane carries:",
+      off === "no limit" && /no ceiling is set/i.test(offEff)
+        && on === "6 patients" && /at the ceiling/i.test(onEff)
+        && /12 in all/.test(two)
+        ? "yes (off \"" + off + "\"; at 6 \"" + on + "\"; two providers \"" + two + "\")"
+        : "FAIL — off \"" + off + "\" / \"" + offEff.slice(0,50) + "\", on \"" + on
+          + "\" / \"" + onEff.slice(0,60) + "\", two \"" + two + "\"");
+    S.capPerDoc=0; S.docs=1; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8;
+  }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 

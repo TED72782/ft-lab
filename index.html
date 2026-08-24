@@ -822,7 +822,14 @@ function sim(cfg){
   let qSum = 0, qN = 0, hSum = 0, hN = 0;   // provider-queue and space-hold accumulators
   const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
-         shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace} = cfg;
+         shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0} = cfg;
+  /* ⚠ HOW MANY PATIENTS ONE PROVIDER WILL HOLD AT ONCE — a POLICY ceiling, like the acuity
+     ratios, not a measured quantity. `ab+rb` is every patient occupying a space and the engine
+     already calls that "the physician's concurrent load"; this refuses to seat past
+     capPerDoc x docs of it, so the overflow waits OUTSIDE instead of being taken on.
+     0 is off and the engine is then bit-identical — no cap, no arithmetic. Meaningless without
+     a provider, so docs=0 also disables it. */
+  const capTot = (capPerDoc > 0 && docs > 0) ? capPerDoc * docs : Infinity;
   // `trace` records one evening, patient by patient, so the animation plays the SAME run the
   // numbers come from rather than a decorative loop of its own. Slots are tracked only here —
   // the maths never needs to know which chair, only how many are free.
@@ -830,7 +837,7 @@ function sim(cfg){
   const freeA = [], freeB = [];
   if(T){ for(let i=A-1;i>=0;i--) freeA.push(i); for(let i=R-1;i>=0;i--) freeB.push(i) }
   const H = lam.length, CLOSE = H*60;
-  let wa=0, waN=0, wr=0, wrN=0, blocked=0, nw=0, seen=0, arrN=0, divN=0, divWait=0, peakSum=0;
+  let wa=0, waN=0, wr=0, wrN=0, blocked=0, nw=0, seen=0, arrN=0, divN=0, divWait=0, peakSum=0, peakInSum=0;
   /* ⚠ TWO STREAMS NEED TWO SETS OF NUMBERS. In `stream` the pools never lend to each other, so a
      single average hides the whole point — a jammed chair side and an idle bed side average to
      something that describes neither. Accumulated for every bed-shaped layout, reported only
@@ -882,6 +889,13 @@ function sim(cfg){
       const slotA = T ? new Int16Array(arr.length).fill(-1) : null;
       const slotB = T ? new Int16Array(arr.length).fill(-1) : null;
       let ab=0, rb=0, peak=0, pkA=0, pkB=0;
+      /* ⚠ PATIENTS, NOT SPACES. `ab+rb` counts spaces IN USE, and during a split's move the
+         patient is already in the second area while the assessment space is still being
+         turned over — so ab+rb counts them twice for that window. Fine for the spaces KPI
+         (both spaces really are unavailable); wrong for a ceiling expressed in patients,
+         which read 4 under a cap of 3. This counts bodies in the lane: up on admission,
+         down on departure, unchanged by a move. */
+      let inLane=0, peakIn=0;
       const seated = new Int32Array(gnext);      // members of each party that have arrived
       /* ab+rb is every patient occupying a space — including one stuck in assessment with
          nowhere to move to. That total IS the physician's concurrent load. Capacity is A+R;
@@ -931,7 +945,7 @@ function sim(cfg){
       const rec = (tag,w,dv) => { const tt=w+floor+floorRoom*(load ? load[hb(arr[tag])] : 1); if(!dv){wa+=tt;waN++} hs[hb(arr[tag])]+=tt; hn[hb(arr[tag])]++;
         if(bedReq){ const b=BY[bedReq[tag]]; b.wait+=tt; b.n++; if(dv) b.div++; else b.seen++ } };
 
-      const startA = (t,tag) => { ab++;
+      const startA = (t,tag) => { ab++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
@@ -990,8 +1004,8 @@ function sim(cfg){
       const partySize = g => { let n=0; for(const q of qa) if(gid[q[1]]===g) n++; return n };
       const seatParty = (t, g, start) => { for(let j=qa.length-1;j>=0;j--) if(gid[qa[j][1]]===g){
           const q=qa.splice(j,1)[0]; rec(q[1], t-q[0]); start(t,q[1]) } };
-      const takeOne = t => { if(!qa.length || ab>=A) return false;
-        const free = A-ab;
+      const takeOne = t => { if(!qa.length || ab>=A || inLane>=capTot) return false;
+        const free = Math.min(A-ab, capTot-inLane);
         const i = qa.findIndex(q => partySize(gid[q[1]]) <= free);
         if(i<0) return false;
         seatParty(t, gid[qa[i][1]], startA); return true };
@@ -1015,10 +1029,10 @@ function sim(cfg){
       const draw = (tag, t) => { const w = r()<shr;
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
         return holdOf(t, w, w ? pick(r,asw)+pick(r,res) : pick(r,now)) };
-      const startBed = (t,tag) => { ab++;
+      const startBed = (t,tag) => { ab++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         second[tag]=0; ev.push([t+draw(tag,t),1,tag]) };
-      const startChair = (t,tag) => { rb++;
+      const startChair = (t,tag) => { rb++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeB.pop(); slotB[tag]=s; T.push({t, id:tag, ev:"second", slot:s}) }
         ev.push([t+draw(tag,t),2,tag]) };
       /* Same one-party rule as the split lane. A party needs room for ALL of it before any of it
@@ -1061,8 +1075,9 @@ function sim(cfg){
           const idx = party(gid[qa[i][1]]);
           let needBed=0; for(const j of idx) if(bedReq[qa[j][1]]) needBed++;
           const rest = idx.length-needBed, fa = A-ab, fr = R-rb;
-          const fits = stream ? (needBed <= fa && rest <= fr)          // each side on its own
-                              : (needBed <= fa && rest <= (fa-needBed) + fr);
+          const room = capTot - inLane;                  // the provider ceiling, both sides
+          const fits = idx.length <= room && (stream ? (needBed <= fa && rest <= fr)
+                              : (needBed <= fa && rest <= (fa-needBed) + fr));
           if(fits){ seatBedParty(t, idx); return true }
         }
         return false };
@@ -1113,7 +1128,7 @@ function sim(cfg){
                            whole-party rule almost never bit — 17% of pairs and a third of triples
                            were still split. Drain once the last member has arrived. */
                         if(++seated[gid[tag]] === gsz[tag]) drain(t) }
-          else if(kind===1 || kind===2){ seen++;
+          else if(kind===1 || kind===2){ seen++; inLane--;
                  if(T) T.push({t, id:tag, ev:"leave"});
                  if(kind===1) releaseA(t,tag); else releaseB(t,tag) }
           else { // the space is turned over and usable again
@@ -1133,14 +1148,14 @@ function sim(cfg){
           // ⚠ the assessment space is released on a MOVE too, not only on a departure — it still
           // has to be turned over before the next patient can use it either way
           if(!second[tag]){ if(T) T.push({t, id:tag, ev:"leave"});
-            releaseA(t,tag); continue }                             // never moved on
+            inLane--; releaseA(t,tag); continue }                   // never moved on
           nw++;
           if(rb<R){ wrN++; startB(t,tag); releaseA(t,tag) }
           else { qr.push([t,tag]); blocked++;
                  if(T) T.push({t, id:tag, ev:"stuck"}) }             // nowhere to move to
         } else if(kind===2){
           if(T) T.push({t, id:tag, ev:"leave"});
-          releaseB(t,tag);
+          inLane--; releaseB(t,tag);
         } else if(kind===3){                                        // assessment space turned over
           ab--; if(T){ freeA.push(slotA[tag]); freeEv(t,tag,"A") }
           takeNext(t);
@@ -1152,7 +1167,7 @@ function sim(cfg){
         }
         if(ab+rb > peak) peak = ab+rb;
       }
-      peakSum += peak; BY[1].peak += pkA; BY[0].peak += pkB;
+      peakSum += peak; peakInSum += peakIn; BY[1].peak += pkA; BY[0].peak += pkB;
     }
   }
   if(T) return {trace:T, A, R};
@@ -1167,7 +1182,7 @@ function sim(cfg){
           seen: seen/runs, arrived: arrN/runs, diverted: divN/runs,
           divByHour: [...divH].map(v=>v/runs),
           divPct: 100*divN/arrN, saturated: divN/arrN > 0.02,
-          peak: peakSum/runs,
+          peak: peakSum/runs, peakLoad: peakInSum/runs,
           /* one entry per stream: chairs then beds. `wait` is per patient routed to that side,
              INCLUDING the ones it never seated — same convention as the lane-wide figure. */
           streams: BY.map(b => ({share: arrN ? b.n/arrN : 0, n: b.n/runs,
@@ -1207,7 +1222,7 @@ function buildTrace(){
                    bit-identical at every setting of a dial worth ~5 score points — a lane the
                    score has jamming played as one emptying. The fingerprint guard could not see
                    it: it identifies MODES, and these are numeric parameters. */
-                docs:S.docs, docMin:D.doc_min ?? 18, postShare:D.postdoc_share,
+                docs:S.docs, docMin:D.doc_min ?? 18, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
                 floorRoom: S.docs ? (D.floor_room ?? 0) : 0,
                 load: (D.occ24 && D.load_beta)
                   ? Array.from({length:S.len}, (_,i) => Math.max(1, Math.min(2.2,
@@ -1561,7 +1576,8 @@ function evaluate(cfg, dayTotal){
   const o = accepted < 0.05 ? {idle:true, docWait:0, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
                                byHour:hours.map(()=>0), diverted:0, divByHour:hours.map(()=>0),
                                arrived:0, seen:0, divPct:0}
-    : sim({A:cfg.A, R:m.hasR?cfg.R:0, pooled:cfg.mode==="pooled", bedGrp:cfg.bedGrp, ...turnFor(cfg),
+    : sim({capPerDoc:cfg.capPerDoc ?? 0,
+           A:cfg.A, R:m.hasR?cfg.R:0, pooled:cfg.mode==="pooled", bedGrp:cfg.bedGrp, ...turnFor(cfg),
            bedFirst:cfg.mode==="bedfirst", stream:cfg.mode==="stream",
            // a row saved during the brief flat-share build carries one number and no list
            bedShare: cfg.bedcc === undefined && cfg.bedShare !== undefined
@@ -1750,7 +1766,7 @@ const LEVELS = [
 // as acceptable is a judgement for the room, not a line in a chart.
 const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
            fastDischarge:false, level:1, bar:"today", start:15, len:8, bedExtra:0, bedIntp:true,
-           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, docs:1, ccSort:"vol",
+           bedGrp:true, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, docs:1, capPerDoc:0, ccSort:"vol",
            /* ⚠ AN ASSUMPTION, AND IT HAS TO BE. It was briefly set to 67 — roomed -> DECISION —
               on the reading that a no-test patient can only leave the assessment space once the
               call is made. Operator, 2026-08-22: they can move as soon as the ASSESSMENT is done,
@@ -1768,7 +1784,7 @@ const S = {mode:"split", A:6, R:4, budget:0, cyc:Math.round(D.T_A), assess:44,
    RangeError, which happened before a single button was wired, so Add / Play / Copy link were
    all inert. Limits mirror the sliders, so a clamped link lands somewhere the UI can show. */
 const LIM = {A:[1,30], R:[0,16], cyc:[55,115], assess:[10,90], assessNo:[10,120],
-             start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15], loadPct:[0,200], docs:[0,4]};
+             start:[0,23], len:[2,24], bedExtra:[0,40], turnRoom:[0,30], turnChair:[0,15], loadPct:[0,200], docs:[0,4], capPerDoc:[0,20]};
 /* ⚠ ONE PLACE DECIDES WHAT A LAYOUT CAN HOLD. A divided lane splits across two sliders (14+16)
    while a pooled one has a single slider, so the same estate is not representable the same way —
    and the mode switch used to resolve that by DISCARDING the difference. It refits instead: the
@@ -1956,6 +1972,15 @@ function drawTurn(){
          <label for="dcs">Providers covering the lane</label>
          <output class="num" id="dcsOut"></output></div>
        <input type="range" id="dcs" min="0" max="4" step="1" value="${S.docs}"></div>
+       <div class="ctl"><div class="ctl-top">
+         <label for="cpd">Most patients one provider will hold at once</label>
+         <output class="num" id="cpdOut"></output></div>
+       <input type="range" id="cpd" min="0" max="20" step="1" value="${S.capPerDoc}"></div>
+       <div class="hint"><b>A ceiling you set, not a number from the data.</b> Everyone occupying
+         a space is on the provider &mdash; including anyone assessed and waiting on a result. Set
+         a limit and the lane stops taking patients once it is reached: they wait outside instead
+         of being taken on, so the wait rises and the load falls. That trade is the point.
+         <span id="cpdEff"></span></div>
        <div class="hint"><b>A space is not care.</b> Taking a chair puts a patient in line for a
          person, and that line is most of what they wait: in the current pod <b>not one patient in
          746</b> was seated with every chair full, yet the middle one still waited
@@ -1979,6 +2004,7 @@ function drawTurn(){
     $("trn").oninput = e => { S.turnRoom  = +e.target.value; syncTurn(); requestRun() };
     $("trc").oninput = e => { S.turnChair = +e.target.value; syncTurn(); requestRun() };
     $("ldk").oninput = e => { S.loadPct   = +e.target.value; syncTurn(); requestRun() };
+    $("cpd").oninput = e => { S.capPerDoc = +e.target.value; syncTurn(); requestRun() };
     $("dcs").oninput = e => { S.docs      = +e.target.value; syncTurn(); requestRun() };
   }
   syncTurn();
@@ -1992,6 +2018,22 @@ function drawTurn(){
    as minutes of wait. Those differ: the queue amplifies service time, so a provider running
    8 min slower delays being seen by more than 8. Printing it as wait would overstate the dial
    and contradict the paragraph above it. */
+/* The measured load, from the run — LAST_PEAK is the mean busiest-moment occupancy, which the
+   engine calls the physician's concurrent load. Reported per provider because that is the
+   quantity the ceiling is expressed in. Nothing is computed here: a cap that binds and a lane
+   that never reaches it look identical on the slider alone, and only the run can tell them
+   apart. */
+function capEffect(){
+  if(LAST_PEAK == null || !S.docs) return "";
+  const per = LAST_PEAK / S.docs;
+  const t = " At this setting the lane's busiest moment averages " + per.toFixed(1)
+    + " patients per provider.";
+  if(!S.capPerDoc) return t + " No ceiling is set.";
+  return t + (per >= S.capPerDoc - 0.25
+    ? " It is sitting at the ceiling, so the ceiling is what is limiting the lane."
+    : " The ceiling is not being reached, so it is costing nothing here.");
+}
+
 function loadText(){
   const p = S.loadPct;
   return p === 0 ? "none" : p === 100 ? "as today" : (p/100).toFixed(1) + "\u00d7 today's";
@@ -2031,6 +2073,10 @@ function syncTurn(){
   const y=$("trc"); if(y && +y.value !== S.turnChair) y.value = S.turnChair;
   const c=$("ldkOut"); if(c) c.textContent = loadText();
   const le=$("ldkEff"); if(le) le.textContent = loadEffect();
+  const cp=$("cpdOut"); if(cp) cp.textContent = S.capPerDoc === 0 ? "no limit"
+    : S.capPerDoc + (S.docs > 1 ? " each (" + S.capPerDoc*S.docs + " in all)" : " patients");
+  const cq=$("cpd"); if(cq && +cq.value !== S.capPerDoc) cq.value = S.capPerDoc;
+  const ce=$("cpdEff"); if(ce) ce.textContent = capEffect();
   const z=$("ldk"); if(z && +z.value !== S.loadPct) z.value = S.loadPct;
   const d=$("dcsOut"); if(d) d.textContent = S.docs === 0 ? "none — spaces only"
     : S.docs + (S.docs === 1 ? " provider" : " providers");
@@ -2310,6 +2356,7 @@ function sane(cfg){
              being scored without it — defaulting to 100 would silently re-rank other people's
              lanes under an effect they never chose. New rows always carry the field. */
           loadPct: lim("loadPct", cfg.loadPct, 0),
+          capPerDoc: lim("capPerDoc", cfg.capPerDoc, 0),
           /* a row saved before the provider queue existed was scored without it — same rule */
           docs: lim("docs", cfg.docs, 0),
           bedcc: cfg.bedcc ?? undefined, bedExtra: lim("bedExtra", cfg.bedExtra, 0),
@@ -2366,7 +2413,7 @@ async function addEntry(){
                   page's own engine says it LOSES 3.2: the sign of the answer flipped, on the
                   artefact physicians are sent. A comment three lines below claimed "new rows
                   always carry the field"; nothing wrote it. */
-               loadPct:S.loadPct, docs:S.docs,
+               loadPct:S.loadPct, docs:S.docs, capPerDoc:S.capPerDoc,
                /* ⚠ NO bedShare HERE, DELIBERATELY. A sweep flagged that the board scores on
                   `cfg.bedShare` while addEntry never wrote it. But evaluate() honours that field
                   ONLY when `cfg.bedcc === undefined` (line ~650), i.e. for rows saved before the
@@ -2498,6 +2545,7 @@ function hashState(){
   c.push(String(S.assessNo));                                                  // 17
   c.push(String(S.loadPct));                                                   // 18
   c.push(String(S.docs));                                                      // 19
+  c.push(String(S.capPerDoc));                                                 // 20
   return c.join(",");
 }
 function toHash(){
@@ -2549,6 +2597,7 @@ function fromHash(){
   /* a link written before the load stretch existed was scored without it — see sane() */
   S.loadPct = lim("loadPct", at(18, 0), 0);
   S.docs    = lim("docs",    at(19, 0), 0);
+  S.capPerDoc = lim("capPerDoc", at(20, 0), 0);   // absent on an older link = off
   /* ⚠ an empty criteria field means EVERY complaint, so it must RESET PICK, not leave it. A link
      is a full setting, like a preset — landing on an unnarrowed link while narrowed kept the old
      narrowing and scored a lane the link did not describe. */
@@ -2838,11 +2887,14 @@ function run(){
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
                bedcc: BEDPICK.size ? [...BEDPICK].sort((a,b)=>a-b).join(".") : "-", bedExtra:S.bedExtra, bedIntp:S.bedIntp,
                bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
-               loadPct:S.loadPct, docs:S.docs, assessNo:S.assessNo,
+               loadPct:S.loadPct, docs:S.docs, capPerDoc:S.capPerDoc, assessNo:S.assessNo,
                cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len, bar:S.bar};
   const E = evaluate(cfg, lvl.pts), o = E.o;
   LAST_SCORE = E.score;   // what the hero card is about to show, exposed so a guard can compare
   LAST_HOLD  = o.holdMean;   // set BEFORE drawSpeed below, which reads it
+  LAST_PEAK  = o.peakLoad ?? o.peak;   // ditto for drawTurn's provider-load line. peakLOAD:
+                             // patients, the quantity the ceiling is expressed in — `peak`
+                             // is spaces in use and reads high in a layout that moves people
                           // the SAVED row against it — the save path had no test at all
   drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
   $("speedCtl").querySelectorAll("[data-fd]").forEach(bt=>bt.onclick=()=>{
@@ -2986,7 +3038,7 @@ function run(){
   const critKey = `${S.start}|${S.len}|${S.level}|${[...PICK].sort((x,y)=>x-y).join(".")}`
     + `|${S.mode}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.ccSort}`;
   if(critKey !== lastCritKey){ lastCritKey = critKey; drawCriteria() }
-  const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}|${S.loadPct}|${S.docs}`;
+  const bedKey = `${S.mode}|${critKey}|${[...BEDPICK].sort((x,y)=>x-y).join(".")}|${S.bedExtra}|${S.bedIntp?1:0}|${S.bedGrp?1:0}|${S.turnRoom}|${S.turnChair}|${S.roomsA?1:0}|${S.assessNo}|${S.loadPct}|${S.docs}|${S.capPerDoc}`;
   if(bedKey !== lastBedKey){ lastBedKey = bedKey; drawBedList() }
   const boardKey = `${S.level}|${S.bar}`;
   if(boardKey !== lastBoardKey){ lastBoardKey = boardKey; drawBoard() }
@@ -3015,7 +3067,7 @@ function run(){
    an open tab is how these actually get passed around.
    The guard is SELF_HASH: run() rewrites the address on every recompute, and reacting to our own
    write would reset the lane mid-edit. Only a hash we did not write is treated as an arrival. */
-var SELF_HASH = "", LAST_SCORE = null, LAST_HOLD = null;
+var SELF_HASH = "", LAST_SCORE = null, LAST_HOLD = null, LAST_PEAK = null;
 /* LAST_HOLD is the engine's measured mean space-hold, not a formula. hold_all x cyc/T_A
    looks like it should give the same number and does NOT — it is out by up to 13 min,
    because the hold also contains the provider queue and the rooming floor, and neither

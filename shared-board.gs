@@ -28,7 +28,11 @@ var HEAD = ['who', 'mode', 'A', 'R', 'cyc', 'assess', 'fastDischarge', 'at',
             // ⚠ added 2026-08-23 WITH the engine change, not after it. These two are SCORED
             // fields; a board that cannot carry them silently reads every row as legacy and
             // scores it on the previous engine, which inverted the page's own conclusion.
-            'loadPct', 'docs'];
+            'loadPct', 'docs',
+            // ⚠ added 2026-08-23 WITH the engine change. A SCORED field the board cannot
+            // carry makes every saved row score on the previous engine — that has happened
+            // here once already, and it inverted the page's own conclusion.
+            'capPerDoc'];
 
 function sheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -93,7 +97,8 @@ function read_() {
              // saved before the two halves were split actually meant
              assessNo: r[18] === '' || r[18] === undefined ? undefined : Number(r[18]),
              loadPct: r[19] === '' || r[19] === undefined ? undefined : Number(r[19]),
-             docs:    r[20] === '' || r[20] === undefined ? undefined : Number(r[20]) },
+             docs:    r[20] === '' || r[20] === undefined ? undefined : Number(r[20]),
+             capPerDoc: r[21] === '' || r[21] === undefined ? undefined : Number(r[21]) },
       at: Number(r[7]) || 0
     });
   }
@@ -141,7 +146,8 @@ function doPost(e) {
         (rows[i][17] === true || rows[i][17] === 'TRUE') === (c.roomsA === true) &&
         Number(rows[i][18] || 0) === Number(c.assessNo || 0) &&
         Number(rows[i][19] || 0) === Number(c.loadPct || 0) &&
-        Number(rows[i][20] || 0) === Number(c.docs || 0)) {
+        Number(rows[i][20] || 0) === Number(c.docs || 0) &&
+        Number(rows[i][21] || 0) === Number(c.capPerDoc || 0)) {
         sh.deleteRow(i + 1);
       }
     }
@@ -174,7 +180,8 @@ function doPost(e) {
                   c.roomsA === true,
                   c.assessNo === undefined || c.assessNo === null ? '' : Number(c.assessNo),
                   c.loadPct === undefined || c.loadPct === null ? '' : Number(c.loadPct),
-                  c.docs === undefined || c.docs === null ? '' : Number(c.docs)]);
+                  c.docs === undefined || c.docs === null ? '' : Number(c.docs),
+                  c.capPerDoc === undefined || c.capPerDoc === null ? '' : Number(c.capPerDoc)]);
     return json_(read_());
   } catch (err) {
     return json_({ error: String(err) });
