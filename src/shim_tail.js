@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 113;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 115;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1674,6 +1674,60 @@ setTimeout(async ()=>{ try{
           + ", noGain " + OPT.noGain);
     OPT.result = null; OPT.prev = null; OPT.noGain = null;
     S.mode="split"; S.A=6; S.R=4; run();
+  }
+
+
+  /* ── the complaint and room chips (2026-08-24) ────────────────────────────────────────────
+     Same failure class as the layout buttons: the page can score one lane while the chips show
+     another. Twenty-six chips make a single wrong one nearly impossible to spot by eye, which
+     is exactly the case a test should carry rather than a person. Reads the rendered MARKUP —
+     a check that reads PICK can never see the chips disagreeing with PICK. */
+  {
+    const chipsOf = () => {
+      const out = {cc:new Set(), bed:new Set(), ccTotal:0, bedTotal:0};
+      for(const b of ($("ccList").innerHTML.match(/<button[^>]*>/g) || [])){
+        const on = /aria-pressed="true"/.test(b);          // attribute order is not assumed
+        const c = /data-cc="(\d+)"/.exec(b), d = /data-bed="(\d+)"/.exec(b);
+        if(c){ out.ccTotal++; if(on) out.cc.add(+c[1]) }
+        if(d){ out.bedTotal++; if(on) out.bed.add(+d[1]) }
+      }
+      return out;
+    };
+    const eq = (a,b) => a.size === b.size && [...a].every(x => b.has(x));
+    const nm = i => (CC.find(c=>c.i===i) || {}).n;
+
+    /* a NARROWED lane in a layout that has rooms — both sets must be exact */
+    S.mode="bedfirst"; S.A=6; S.R=4; S.start=15; S.len=8; S.level=1;
+    PICK = new Set(CC.map(x=>x.i).filter(i => i % 3 !== 0));
+    BEDPICK = new Set(BED_IDS);
+    drawModes(); drawSpaces(); run();
+    const R = chipsOf();
+    const ccOk = eq(PICK, R.cc), bedOk = eq(BEDPICK, R.bed);
+    console.log("the complaint and room chips show what the page is scoring:",
+      ccOk && bedOk
+        ? "yes (" + R.cc.size + "/" + R.ccTotal + " complaints and " + R.bed.size
+          + " room marks, each the exact set the engine holds)"
+        : "FAIL — complaints " + (ccOk ? "ok" : "lit " + [...R.cc].length + " vs engine " + PICK.size
+            + ", wrong: " + [...PICK].filter(i=>!R.cc.has(i)).map(nm).join("/"))
+          + "; rooms " + (bedOk ? "ok" : "lit " + [...R.bed].map(nm).join("/")
+            + " vs engine " + [...BEDPICK].map(nm).join("/")));
+
+    /* ⚠ AND A LAYOUT WITHOUT ROOMS MUST HIDE THE ROOM TOGGLES, NOT SHOW THEM CLEARED. The
+       engine keeps BEDPICK while pooled ignores it, so rendering the toggles unlit would tell
+       an operator their room list had been wiped when it had not — a lie of the same shape as
+       the one this section exists for, pointing the other way. */
+    S.mode="pooled"; S.A=10; S.R=0; drawModes(); drawSpaces(); run();
+    const P = chipsOf();
+    console.log("a layout with no rooms hides the room marks rather than clearing them:",
+      P.bedTotal === 0 && BEDPICK.size > 0 && eq(PICK, P.cc)
+        ? "yes (no room toggles drawn; the engine still holds " + BEDPICK.size
+          + ", and the complaint chips are still exact)"
+        : "FAIL — " + P.bedTotal + " room toggles drawn in pooled (" 
+          + P.bed.size + " lit), engine holds " + BEDPICK.size
+          + "; complaints " + (eq(PICK,P.cc) ? "ok" : "WRONG"));
+
+    S.mode="split"; S.A=6; S.R=4; PICK = new Set(CC.map(x=>x.i)); BEDPICK = new Set(BED_IDS);
+    drawModes(); drawSpaces(); run();
   }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
