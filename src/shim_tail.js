@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 112;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 113;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1611,6 +1611,30 @@ setTimeout(async ()=>{ try{
     console.log("the optimiser keeps the estate you gave it:",
       nowTotal === MINE.total ? "yes (" + MINE.total + " spaces in, " + nowTotal + " out)"
         : "FAIL — " + MINE.total + " spaces in, " + nowTotal + " out");
+
+    /* ⚠ THE CONTROLS MUST SHOW THE LANE THE PAGE IS SCORING. run() does not redraw the layout
+       buttons or the space sliders — by design, so a drag is not interrupted — so every path
+       that moves the lane in code has to redraw them itself. The optimiser did not, and the
+       result was a page scoring pooled 10 while the buttons still read split 6+4: it had
+       applied, and looked exactly as though it had not. Read the CONTROLS, not the state. */
+    {
+      /* read the rendered MARKUP, not the state — a guard that reads S can never see the
+         controls disagreeing with it, which is the entire failure being guarded against */
+      const modes = $("modes").innerHTML, spaces = $("spaceCtl").innerHTML;
+      const pressed = [...modes.matchAll(/data-m="([a-z]+)" aria-pressed="true"/g)].map(x=>x[1]);
+      const val = k => { const m = spaces.match(new RegExp('id="s'+k+'"[^>]*value="(\\d+)"')); 
+                         return m ? +m[1] : null };
+      const a = val("A"), r = val("R");
+      const okMode = pressed.length === 1 && pressed[0] === S.mode;
+      const okA = a === null || a === S.A;
+      const okR = !modeOf().hasR || r === null || r === S.R;
+      console.log("the controls show the lane the optimiser applied:",
+        okMode && okA && okR
+          ? "yes (buttons and sliders read " + S.mode + " " + S.A +
+            (modeOf().hasR ? "+" + S.R : "") + ", same as the score)"
+          : "FAIL — page scores " + S.mode + " " + S.A + "+" + S.R +
+            " but controls read " + (pressed.join(",") || "no mode") + " " + a + "+" + r);
+    }
 
     /* PUT IT BACK has to be exact, or the operator cannot undo a search they did not want. */
     const changed = OPT.result != null;

@@ -2113,6 +2113,24 @@ function nameOf(ids){
   if(n === CC.length) return "every complaint";
   return n + " of " + CC.length + " complaints";
 }
+/* ⚠ NAME THEM. "24 of 26 complaints" tells you a count and not a lane: the operator could not
+   see WHICH the optimiser had picked, and reasonably read a result they could not verify as one
+   that had not been applied. Always spell the set out — whichever side of it is shorter, so a
+   nearly-full list reads as "everything except X" rather than twenty-four names. */
+function listOf(ids){
+  const inc = CC.filter(c => ids.has(c.i)).map(c => c.n);
+  const exc = CC.filter(c => !ids.has(c.i)).map(c => c.n);
+  if(!inc.length) return "nobody";
+  if(!exc.length) return "every complaint";
+  return exc.length <= inc.length
+    ? "every complaint except <b>" + exc.map(esc).join("</b>, <b>") + "</b>"
+    : "<b>" + inc.map(esc).join("</b>, <b>") + "</b>";
+}
+function optRow(label, val, was){
+  return '<tr><th>' + label + '</th><td>' + val +
+    (was == null ? ' <span class="was">unchanged</span>'
+                 : ' <span class="was">was ' + was + '</span>') + '</td></tr>';
+}
 function optTick(){
   const bar = document.getElementById("optBar");
   if(!bar) return drawOpt();          // panel not in progress shape yet
@@ -2150,23 +2168,30 @@ function drawOpt(){
   }
   if(r && prev){
     const d = prev.score - r.score;
-    const ch = [];
-    if(r.mode !== prev.mode) ch.push("layout &rarr; <b>" + esc(MODES.find(m=>m.id===r.mode).t) + "</b>");
-    if(r.A !== prev.A || r.R !== prev.R)
-      ch.push("spaces &rarr; <b>" + r.A + (MODES.find(m=>m.id===r.mode).hasR ? "+" + r.R : "") + "</b>");
-    if(nameOf(r.pick) !== nameOf(prev.pick)) ch.push("takes <b>" + nameOf(r.pick) + "</b>");
-    if(nameOf(r.bed) !== nameOf(prev.bed)) ch.push("must have a room: <b>" + nameOf(r.bed) + "</b>");
+    const M = MODES.find(m=>m.id===r.mode), PM = MODES.find(m=>m.id===prev.mode);
+    const spaces = v => v.A + (MODES.find(m=>m.id===v.mode).hasR ? " + " + v.R : "");
+    const changed = r.mode !== prev.mode || r.A !== prev.A || r.R !== prev.R
+      || listOf(r.pick) !== listOf(prev.pick) || listOf(r.bed) !== listOf(prev.bed);
+    /* EVERY setting it chose, not only the ones that moved — the whole point is that you can
+       read the arrangement off this panel and check it against the controls above. */
+    const rows =
+      optRow("Layout", "<b>" + esc(M.t) + "</b>", r.mode !== prev.mode ? esc(PM.t) : null) +
+      optRow(M.hasR ? "Spaces" : "Spaces", "<b>" + spaces(r) + "</b>",
+             (r.A !== prev.A || r.R !== prev.R || r.mode !== prev.mode) ? spaces(prev) : null) +
+      optRow("Takes", listOf(r.pick), listOf(r.pick) !== listOf(prev.pick) ? listOf(prev.pick) : null) +
+      (M.hasR ? optRow("Needs a room", listOf(r.bed),
+                       listOf(r.bed) !== listOf(prev.bed) ? listOf(prev.bed) : null) : "");
     out += '<div class="opt-res"><div class="opt-res-h">' +
-      (d > 0.05 ? "Found <b>" + d.toFixed(1) + " min</b> a patient, " + prev.score.toFixed(1) +
-                  " &rarr; <b>" + r.score.toFixed(1) + "</b>"
-                : "Nothing better than what you had &mdash; it already scores " +
-                  prev.score.toFixed(1)) + '</div>' +
-      (ch.length ? "<ul>" + ch.map(x=>"<li>" + x + "</li>").join("") + "</ul>"
-                 : '<div class="dim">Your settings were already the best arrangement it could find.</div>') +
+      (d > 0.05
+        ? '<b>Applied.</b> ' + prev.score.toFixed(1) + ' &rarr; <b>' + r.score.toFixed(1) +
+          '</b> &mdash; ' + d.toFixed(1) + ' min a patient better. The controls above now show this lane.'
+        : 'Nothing better than what you had &mdash; it already scores ' + prev.score.toFixed(1) +
+          ', and nothing has been changed.') + '</div>' +
+      (changed ? '<table class="opt-tab">' + rows + '</table>' : '') +
       '<div class="dim">&#9888; This ranks arrangements by <b>minutes of delay</b>. Whether a ' +
       'complaint can safely be seen in a chair is a clinical judgement, and nothing here can ' +
       'make it &mdash; treat a complaint list it suggests as a question for the group, not an answer.</div>' +
-      (ch.length ? '<button class="btn" id="optUndo">Put it back</button>' : '') +
+      (changed ? '<button class="btn" id="optUndo">Put it back</button>' : '') +
       '</div>';
   }
   host.innerHTML = out;
@@ -2176,7 +2201,9 @@ function drawOpt(){
     const p = OPT.prev;
     S.mode = p.mode; S.A = p.A; S.R = p.R;
     PICK = new Set(p.pick); BEDPICK = new Set(p.bed);
-    OPT.result = null; OPT.prev = null; run();
+    OPT.result = null; OPT.prev = null;
+    drawModes(); drawSpaces();      // same reason as finishOpt — undo moves the lane too
+    run();
   };
 }
 
@@ -2341,7 +2368,14 @@ function finishOpt(){
       OPT.noGain = mine;
     }
   }
-  run();          // redraws everything, including this panel
+  /* ⚠ run() DOES NOT REDRAW THE LAYOUT BUTTONS OR THE SPACE SLIDERS, deliberately — rebuilding
+     them on every recompute would replace the slider under the mouse mid-drag. So every path
+     that changes the lane in code redraws them itself: presets, a loaded board row, a shared
+     link and first paint all do. The optimiser was the one that did not, so it applied its
+     answer and left the controls showing the OLD lane — the page scored pooled 10 while the
+     buttons still read split 6+4, and it looked for all the world like nothing had happened. */
+  drawModes(); drawSpaces();
+  run();          // redraws everything else, including this panel
 }
 
 function run(){
