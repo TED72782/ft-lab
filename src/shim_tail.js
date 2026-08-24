@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 95;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 99;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1405,6 +1405,52 @@ setTimeout(()=>{ try{
     ? "yes (" + jamSide + ", matching the boards)"
     : "FAIL — banner says " + bannerSide + ", the boards say " + jamSide);
   S.mode="split"; S.A=6; S.R=4;
+
+
+  /* ── the two dials a physician could not translate (2026-08-23) ────────────────────────
+     Both used to print a bare percentage of an unstated baseline. These guard the FIX, and
+     the first one guards the trap: the obvious implementation of "minutes a space is tied
+     up" is hold_all x cyc/T_A, and that is WRONG by up to 13 min because the provider queue
+     and the rooming floor live inside the hold and do not scale with the dial. */
+  S.mode="pooled"; S.A=10; S.R=0; S.cyc=55; S.start=15; S.len=8; S.level=1; S.docs=1;
+  PICK=new Set(CC.map(x=>x.i)); run();
+  {
+    const shown = paceText(), engine = Math.round(LAST_HOLD) + " min";
+    const formula = Math.round(D.hold_all * S.cyc / D.T_A);
+    const gap = Math.abs(Math.round(LAST_HOLD) - formula);
+    console.log("the space-hold figure is measured, not computed:",
+      shown === engine && gap >= 5
+        ? "yes (" + shown + " from the run; the formula would say " + formula + " min, " + gap + " out)"
+        : "FAIL — shown " + shown + ", engine " + engine + ", formula " + formula + " (gap " + gap + ")");
+  }
+  {
+    const held = LAST_HOLD; LAST_HOLD = null;
+    console.log("no space-hold figure before a run has produced one:",
+      paceText() === "—" ? "yes (an em dash, not a stand-in number)"
+                              : "FAIL — printed \"" + paceText() + "\" with nothing measured");
+    LAST_HOLD = held;
+  }
+  {
+    S.loadPct = 0;   const a = loadText();
+    S.loadPct = 100; const b = loadText();
+    S.loadPct = 150; const c = loadText();
+    console.log("the crowding dial is named against today, not as a bare percent:",
+      a === "none" && b === "as today" && /today/.test(c) && !/^\d+%$/.test(b)
+        ? "yes (" + a + " / " + b + " / " + c + ")"
+        : "FAIL — " + a + " / " + b + " / " + c);
+  }
+  {
+    S.loadPct = 0;   const z = loadEffect();
+    S.loadPct = 100; const m = loadEffect();
+    S.loadPct = 200; const h = loadEffect();
+    const num = t => { const x = t.match(/takes (\d+) of the provider/); return x ? +x[1] : -1 };
+    console.log("the crowding dial states its cost in provider minutes, and it grows:",
+      /adds nothing/.test(z) && num(m) > 0 && num(h) >= num(m) && !/minutes of wait|min of wait/.test(m)
+        ? "yes (none at 0; " + num(m) + " provider-min at today's, " + num(h) + " at twice)"
+        : "FAIL — z=\"" + z.slice(0,40) + "\" m=" + num(m) + " h=" + num(h));
+    S.loadPct = 100;
+  }
+  S.mode="split"; S.A=6; S.R=4; S.cyc=Math.round(D.T_A);
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
 

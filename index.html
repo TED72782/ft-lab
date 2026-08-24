@@ -1974,8 +1974,8 @@ function drawTurn(){
          lane itself is). So something else shared with the
          department &mdash; nursing and room preparation are the obvious candidates, and
          documentation timing cannot be ruled out &mdash; is what actually delays the start. This
-         dial reproduces that delay; it does not explain it. 100% is what today measures, 0 removes
-         it.</div>`;
+         dial reproduces that delay; it does not explain it.
+         <span id="ldkEff"></span></div>`;
     $("trn").oninput = e => { S.turnRoom  = +e.target.value; syncTurn(); requestRun() };
     $("trc").oninput = e => { S.turnChair = +e.target.value; syncTurn(); requestRun() };
     $("ldk").oninput = e => { S.loadPct   = +e.target.value; syncTurn(); requestRun() };
@@ -1983,13 +1983,43 @@ function drawTurn(){
   }
   syncTurn();
 }
+/* ⚠ "100%" IS NOT A QUANTITY ANYONE CAN ACT ON. The dial is a share of the effect this
+   department actually shows, so it is named that way: today's measured effect is the anchor
+   and the ends are none and twice it.
+
+   The consequence goes in the hint, in minutes, because that is the operational question --
+   and it is stated as PROVIDER MINUTES PER PATIENT, which is where the model applies it, NOT
+   as minutes of wait. Those differ: the queue amplifies service time, so a provider running
+   8 min slower delays being seen by more than 8. Printing it as wait would overstate the dial
+   and contradict the paragraph above it. */
+function loadText(){
+  const p = S.loadPct;
+  return p === 0 ? "none" : p === 100 ? "as today" : (p/100).toFixed(1) + "\u00d7 today's";
+}
+function loadEffect(){
+  if(!D.occ24 || !D.load_beta || !D.doc_min) return "";
+  const fac = LEVELS[S.level].pts / D.day_mean, base = D.occ_floor ?? D.occ_ref;
+  let mult = 1, peak = S.start;
+  for(let i = 0; i < S.len; i++){
+    const h = (S.start + i) % 24;
+    const v = Math.max(1, Math.min(2.2,
+      Math.exp((S.loadPct/100) * D.load_beta * (D.occ24[h]*fac - base))));
+    if(v > mult){ mult = v; peak = h }
+  }
+  if(mult <= 1.005) return "At this setting a busy department adds nothing at any hour you are open.";
+  return "At this setting the busiest hour you are open is " + String(peak).padStart(2,"0")
+    + ":00, where one patient takes " + (D.doc_min*mult).toFixed(0)
+    + " of the provider's minutes against " + (+D.doc_min).toFixed(0) + " in the quiet hours.";
+}
+
 function syncTurn(){
   const a=$("trnOut"), b=$("trcOut");
   if(a) a.textContent = S.turnRoom + " min";
   if(b) b.textContent = S.turnChair + " min";
   const x=$("trn"); if(x && +x.value !== S.turnRoom) x.value = S.turnRoom;
   const y=$("trc"); if(y && +y.value !== S.turnChair) y.value = S.turnChair;
-  const c=$("ldkOut"); if(c) c.textContent = S.loadPct + "%";
+  const c=$("ldkOut"); if(c) c.textContent = loadText();
+  const le=$("ldkEff"); if(le) le.textContent = loadEffect();
   const z=$("ldk"); if(z && +z.value !== S.loadPct) z.value = S.loadPct;
   const d=$("dcsOut"); if(d) d.textContent = S.docs === 0 ? "none — spaces only"
     : S.docs + (S.docs === 1 ? " provider" : " providers");
@@ -2007,7 +2037,7 @@ function drawSpeed(m){
      has its own panel further down beside the complaints it is built from. */
   if(m.id==="bedfirst" || m.id==="stream"){
     host.innerHTML = `<div class="ctl"><div class="ctl-top">
-        <label for="cyc">How fast a space turns over</label>
+        <label for="cyc">How long a space is tied up</label>
         <output class="num" id="cycOut"></output></div>
       <input type="range" id="cyc" min="55" max="115" step="1" value="${S.cyc}">
       <div class="hint">Nobody is moved in this layout, so one space &mdash; room or chair &mdash;
@@ -2024,12 +2054,14 @@ function drawSpeed(m){
        about 50 minutes and steered one of the three layouts the room is choosing between. */
     const pct = Math.round(100 - 100*S.cyc/D.T_A);
     host.innerHTML = `<div class="ctl"><div class="ctl-top">
-        <label for="cyc">How fast a space turns over</label>
+        <label for="cyc">How long a space is tied up</label>
         <output class="num" id="cycOut"></output></div>
       <input type="range" id="cyc" min="55" max="115" step="1" value="${S.cyc}">
       <div class="hint">Nobody moves in this layout, so one space carries the whole visit &mdash;
-        ${Math.round(D.hold_all)} min on average today. This dial runs that faster or slower; it is
-        a pace, not a duration.</div></div>`;
+        <b>${Math.round(D.hold_all)} min on average today</b>. The figure above is what a space is
+        actually tied up for at this setting, measured from the run rather than scaled off the
+        dial &mdash; the queue for a provider and the wait to be roomed sit inside it and do not
+        speed up when care does.</div></div>`;
     $("cyc").oninput = e => { S.cyc = +e.target.value; syncSpeed(m); requestRun() };
     return syncSpeed(m);
   }
@@ -2069,21 +2101,28 @@ function drawSpeed(m){
   syncSpeed(m);
 }
 
+/* Minutes a space is tied up, as MEASURED by the last run. "% faster than today" was a
+   number nobody could act on: a physician cannot staff or size a lane against a percentage
+   of an unstated baseline. During the first paint, and for the instant of a drag before the
+   run lands, there is no measurement yet — say so rather than print a computed stand-in. */
+function paceText(){
+  if(LAST_HOLD == null) return "\u2014";
+  return Math.round(LAST_HOLD) + " min";
+}
+
 /* The cheap half: text only, safe to call on every pointer move. */
 function syncSpeed(m){
   const an=$("asnOut"); if(an) an.textContent = S.assessNo + " min";
   const ai=$("asn"); if(ai && +ai.value !== S.assessNo) ai.value = S.assessNo;
   if(m.id==="bedfirst" || m.id==="stream"){
-    const pct = Math.round(100 - 100*S.cyc/D.T_A);
     const o = $("cycOut");
-    if(o) o.textContent = pct===0 ? "today's pace" : (pct>0 ? pct+"% faster" : (-pct)+"% slower");
+    if(o) o.textContent = paceText();
     const c = $("cyc"); if(c && +c.value !== S.cyc) c.value = S.cyc;
     return;
   }
   if(m.id==="pooled"){
-    const pct = Math.round(100 - 100*S.cyc/D.T_A);
     const o = $("cycOut");
-    if(o) o.textContent = pct===0 ? "today's pace" : (pct>0 ? pct+"% faster" : (-pct)+"% slower");
+    if(o) o.textContent = paceText();
     const s = $("cyc"); if(s && +s.value !== S.cyc) s.value = S.cyc;   // a loaded row moved it, not a drag
     return;
   }
@@ -2792,6 +2831,7 @@ function run(){
                cc: PICK.size ? [...PICK].sort((a,b)=>a-b).join(".") : "-", start:S.start, len:S.len, bar:S.bar};
   const E = evaluate(cfg, lvl.pts), o = E.o;
   LAST_SCORE = E.score;   // what the hero card is about to show, exposed so a guard can compare
+  LAST_HOLD  = o.holdMean;   // set BEFORE drawSpeed below, which reads it
                           // the SAVED row against it — the save path had no test at all
   drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
   $("speedCtl").querySelectorAll("[data-fd]").forEach(bt=>bt.onclick=()=>{
@@ -2964,7 +3004,12 @@ function run(){
    an open tab is how these actually get passed around.
    The guard is SELF_HASH: run() rewrites the address on every recompute, and reacting to our own
    write would reset the lane mid-edit. Only a hash we did not write is treated as an arrival. */
-var SELF_HASH = "", LAST_SCORE = null;   // var, not let: run() assigns it before this line is reached
+var SELF_HASH = "", LAST_SCORE = null, LAST_HOLD = null;
+/* LAST_HOLD is the engine's measured mean space-hold, not a formula. hold_all x cyc/T_A
+   looks like it should give the same number and does NOT — it is out by up to 13 min,
+   because the hold also contains the provider queue and the rooming floor, and neither
+   scales with this dial. Reporting the computed figure is how this label was wrong by
+   ~50 min once before. Take it from the run. */   // var, not let: run() assigns it before this line is reached
 addEventListener("hashchange", () => {
   const h = location.hash.replace(/^#/, "");
   if(!h || h === SELF_HASH) return;
