@@ -2148,8 +2148,10 @@ function drawSpeed(m){
       <div class="hint">Nobody moves in this layout, so one space carries the whole visit &mdash;
         <b>${Math.round(D.hold_all)} min on average today</b>. The figure above is what a space is
         actually tied up for at this setting, measured from the run rather than scaled off the
-        dial &mdash; the queue for a provider and the wait to be roomed sit inside it and do not
-        speed up when care does.</div></div>`;
+        dial. It is the space's own clock &mdash; it starts when the patient sits down, so waiting
+        for a space is not in it. What is in it, besides care, is the <b>wait to be seen</b>: that
+        happens in the chair, and it does not speed up when care does, which is why this figure
+        stops falling before the dial does.</div></div>`;
     $("cyc").oninput = e => { S.cyc = +e.target.value; syncSpeed(m); requestRun() };
     return syncSpeed(m);
   }
@@ -3372,9 +3374,16 @@ function run(){
 var SELF_HASH = "", LAST_SCORE = null, LAST_HOLD = null, LAST_PEAK = null;
 /* LAST_HOLD is the engine's measured mean space-hold, not a formula. hold_all x cyc/T_A
    looks like it should give the same number and does NOT — it is out by up to 13 min,
-   because the hold also contains the provider queue and the rooming floor, and neither
-   scales with this dial. Reporting the computed figure is how this label was wrong by
-   ~50 min once before. Take it from the run. */   // var, not let: run() assigns it before this line is reached
+   because the hold also contains the QUEUE FOR A PROVIDER, which does not scale with this
+   dial. Reporting the computed figure is how this label was wrong by ~50 min once before.
+   Take it from the run.
+
+   ⚠ IT DOES NOT CONTAIN THE WAIT TO BE ROOMED, and both this comment and the slider's own
+   hint said it did until 2026-08-24 (operator: "that should be time spent in the waiting
+   room, not in the chair" — correct). holdOf() is docQueue + raw x postShare; `floorRoom`
+   appears only in rec(), which records the patient's WAIT. Measured: a 0 -> 60 min swing in
+   floorRoom moves the wait for a space 8.5 -> 68.5 and leaves the hold at 124.177 exactly.
+   Guarded, because a space cannot be occupied by someone who is not in it yet. */   // var, not let: run() assigns it before this line is reached
 addEventListener("hashchange", () => {
   const h = location.hash.replace(/^#/, "");
   if(!h || h === SELF_HASH) return;

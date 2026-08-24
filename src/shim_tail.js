@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 115;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 116;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1425,6 +1425,27 @@ setTimeout(async ()=>{ try{
       shown === engine && gap >= 5
         ? "yes (" + shown + " from the run; the formula would say " + formula + " min, " + gap + " out)"
         : "FAIL — shown " + shown + ", engine " + engine + ", formula " + formula + " (gap " + gap + ")");
+  }
+  {
+    /* ⚠ A SPACE CANNOT BE TIED UP BY SOMEONE WHO IS NOT IN IT YET. The slider reports the
+       SPACE's clock — it starts when the patient sits down — so time spent in the waiting room
+       must not appear in it. The hint text claimed it did, for a day, until the operator asked
+       why. The engine was right and the words were wrong; this pins the engine so the words
+       can be trusted against it. Swing the rooming wait hard: the wait for a space must follow
+       it 1:1 and the hold must not move at all. */
+    const L = Array.from({length:8}, (_,i) => D.lam24[(15+i)%24]);
+    const go = fr => sim({A:14, R:0, pooled:true, assessMin:44, assessNo:44, fastDischarge:false,
+      shr:D.shr, lam:L, asw:D.asw, now:D.now, res:D.res, docs:1, docMin:D.doc_min,
+      postShare:D.postdoc_share, floorRoom:fr, days:300, seeds:[11,12]});
+    const a = go(0), b = go(60);
+    const holdSame = Math.abs(a.holdMean - b.holdMean) < 1e-9;
+    const waitFollows = Math.abs((b.wa - a.wa) - 60) < 1e-6;
+    console.log("waiting-room time is not charged to the chair:",
+      holdSame && waitFollows
+        ? "yes (rooming wait 0 -> 60 moves the wait for a space " + a.wa.toFixed(1) + " -> "
+          + b.wa.toFixed(1) + " and leaves the hold at " + a.holdMean.toFixed(3) + ")"
+        : "FAIL — hold " + a.holdMean.toFixed(3) + " -> " + b.holdMean.toFixed(3)
+          + ", wait " + a.wa.toFixed(2) + " -> " + b.wa.toFixed(2) + " (expected +60)");
   }
   {
     const held = LAST_HOLD; LAST_HOLD = null;
