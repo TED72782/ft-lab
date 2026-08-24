@@ -320,6 +320,27 @@ footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid 
 p,li,.hint,.crit-hint,.crit-sum,.crit-f,.stage-f,.stage-sub,.board-note,.dim,.s,.anote,.ahint{text-wrap:pretty}
 h1,h2,h3,.eyebrow,.zone-h,.t,.stat .k{text-wrap:balance}
 
+/* the optimiser's progress + result. Buttons reuse the stage's shape rather than inventing
+   a third button style on a page that already has two. */
+#optCtl .btn{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;padding:8px 14px;
+  border-radius:7px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);
+  text-align:center;display:inline-block}
+#optCtl .btn.primary{background:var(--hold);border-color:var(--hold);color:#fff}
+#optCtl .btn:hover{border-color:var(--ink-3)}
+#optCtl .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#optCtl .hint{margin-top:10px}
+.opt-bar{height:6px;border-radius:4px;background:var(--line);overflow:hidden;margin-bottom:9px}
+.opt-bar i{display:block;height:100%;background:var(--hold);transition:width .18s linear}
+.opt-line{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-size:12.5px;color:var(--ink-3);margin-bottom:10px}
+.opt-res{margin-top:12px;padding:12px 14px;border:1px solid var(--line-soft);border-radius:10px;
+  background:var(--surface-2)}
+.opt-res-h{font-size:13.5px;color:var(--ink);margin-bottom:8px}
+.opt-res ul{margin:0 0 8px;padding-left:18px;font-size:12.5px;color:var(--ink-2)}
+.opt-res li{margin:4px 0}
+.opt-res .dim{font-size:12px;color:var(--ink-3);margin-bottom:8px}
+.opt-res .btn{margin-top:2px}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 <div class="wrap">
@@ -358,6 +379,11 @@ h1,h2,h3,.eyebrow,.zone-h,.t,.stat .k{text-wrap:balance}
     <section class="panel" style="margin-top:14px">
       <div class="panel-h"><div class="eyebrow">2 · Spaces</div></div>
       <div class="panel-b" id="spaceCtl"></div>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+      <div class="panel-h"><div class="eyebrow">Find the best arrangement</div></div>
+      <div class="panel-b" id="optCtl"></div>
     </section>
 
     <section class="panel" style="margin-top:14px">
@@ -2882,6 +2908,243 @@ function requestRun(){
   runTimer = setTimeout(go, 120);
 }
 
+function nameOf(ids){
+  const n = ids.size;
+  if(!n) return "nobody";
+  if(n === CC.length) return "every complaint";
+  return n + " of " + CC.length + " complaints";
+}
+function optTick(){
+  const bar = document.getElementById("optBar");
+  if(!bar) return drawOpt();          // panel not in progress shape yet
+  const pct = Math.min(99, Math.round(100*OPT.done/Math.max(1,OPT.total)));
+  bar.style.width = pct + "%";
+  const pc = document.getElementById("optPct"); if(pc) pc.textContent = pct + "%";
+  const ph = document.getElementById("optPhase");
+  if(ph && ph.textContent !== OPT.phase) ph.textContent = OPT.phase;
+}
+function drawOpt(){
+  const host = $("optCtl"); if(!host) return;
+  const hasR = modeOf().hasR, TOTAL = S.A + (hasR ? S.R : 0);
+  if(OPT.on){
+    const pct = Math.min(99, Math.round(100*OPT.done/Math.max(1,OPT.total)));
+    host.innerHTML =
+      '<div class="opt-run"><div class="opt-bar"><i id="optBar" style="width:' + pct + '%"></i></div>' +
+      '<div class="opt-line"><span id="optPhase">' + esc(OPT.phase) + '</span>' +
+      '<b class="num" id="optPct">' + pct + '%</b></div>' +
+      '<button class="btn" id="optStop">Stop</button></div>';
+    const st = $("optStop"); if(st) st.onclick = () => { OPT.stop = true };
+    return;
+  }
+  const r = OPT.result, prev = OPT.prev;
+  const noGain = OPT.noGain;
+  let out = '<button class="btn primary" id="optGo">Find the best arrangement</button>' +
+    '<div class="hint">Keeps everything you have set &mdash; your hours, the timing dials, the ' +
+    'providers and the ceiling &mdash; and keeps your <b>' + TOTAL + ' spaces</b>. It searches ' +
+    'the four layouts, every way of dividing those spaces, which complaints the lane takes, and ' +
+    'who needs a room rather than a chair.</div>';
+  if(!r && noGain != null){
+    out += '<div class="opt-res"><div class="opt-res-h">Nothing better found &mdash; your lane ' +
+      'already scores <b>' + noGain.toFixed(1) + '</b>.</div>' +
+      '<div class="dim">It searched every layout, every way of dividing your spaces, each ' +
+      'complaint in and out, and who needs a room. Nothing beat what you had.</div></div>';
+  }
+  if(r && prev){
+    const d = prev.score - r.score;
+    const ch = [];
+    if(r.mode !== prev.mode) ch.push("layout &rarr; <b>" + esc(MODES.find(m=>m.id===r.mode).t) + "</b>");
+    if(r.A !== prev.A || r.R !== prev.R)
+      ch.push("spaces &rarr; <b>" + r.A + (MODES.find(m=>m.id===r.mode).hasR ? "+" + r.R : "") + "</b>");
+    if(nameOf(r.pick) !== nameOf(prev.pick)) ch.push("takes <b>" + nameOf(r.pick) + "</b>");
+    if(nameOf(r.bed) !== nameOf(prev.bed)) ch.push("must have a room: <b>" + nameOf(r.bed) + "</b>");
+    out += '<div class="opt-res"><div class="opt-res-h">' +
+      (d > 0.05 ? "Found <b>" + d.toFixed(1) + " min</b> a patient, " + prev.score.toFixed(1) +
+                  " &rarr; <b>" + r.score.toFixed(1) + "</b>"
+                : "Nothing better than what you had &mdash; it already scores " +
+                  prev.score.toFixed(1)) + '</div>' +
+      (ch.length ? "<ul>" + ch.map(x=>"<li>" + x + "</li>").join("") + "</ul>"
+                 : '<div class="dim">Your settings were already the best arrangement it could find.</div>') +
+      '<div class="dim">&#9888; This ranks arrangements by <b>minutes of delay</b>. Whether a ' +
+      'complaint can safely be seen in a chair is a clinical judgement, and nothing here can ' +
+      'make it &mdash; treat a complaint list it suggests as a question for the group, not an answer.</div>' +
+      (ch.length ? '<button class="btn" id="optUndo">Put it back</button>' : '') +
+      '</div>';
+  }
+  host.innerHTML = out;
+  const go = $("optGo"); if(go) go.onclick = () => { drawOpt(); optimise(); drawOpt() };
+  const un = $("optUndo");
+  if(un) un.onclick = () => {
+    const p = OPT.prev;
+    S.mode = p.mode; S.A = p.A; S.R = p.R;
+    PICK = new Set(p.pick); BEDPICK = new Set(p.bed);
+    OPT.result = null; OPT.prev = null; run();
+  };
+}
+
+/* ── the optimiser ─────────────────────────────────────────────────────────────────────────
+   Answers ONE question: given the timing and the hours you have already chosen, what is the
+   best arrangement of the estate you already have?
+
+   ⚠ WHAT IT HOLDS FIXED IS THE POINT. Hours, the assessment times, turnover, providers, the
+   provider ceiling and the crowding dial are all YOURS — the optimiser never touches them,
+   because a search that is free to lengthen the day and add doctors just answers "more of
+   everything" and tells you nothing about layout. THE TOTAL NUMBER OF SPACES IS ALSO HELD:
+   the estate is what it is; the question is how to arrange it.
+
+   ⚠ AND IT OPTIMISES MINUTES, WHICH IS NOT THE SAME AS DECIDING WHO BELONGS IN A FAST TRACK.
+   The complaint list it lands on is a throughput result. Whether a complaint can be seen in a
+   chair is a clinical judgement the MD group has to make, and this cannot make it. The panel
+   says so where the result is shown, not only here.
+
+   It cannot cheat by taking fewer patients: everyone the lane turns away is charged today's
+   main-department wait, so narrowing only wins where the lane genuinely beats the status quo.
+
+   Runs in slices so the page keeps drawing, with a real progress bar and a stop button —
+   several hundred simulations of 600 days each is seconds, not milliseconds. */
+const OPT = {on:false, done:0, total:1, stop:false, result:null, prev:null, phase:"", noGain:null};
+const optCache = new Map();
+/* ⚠ THE SEARCH IS COARSE AND THE VERDICT IS NOT. Scoring every candidate at the page's full
+   600 days x 4 seeds took 40 SECONDS in the browser — too long for a button. At 150 x 2 it is
+   8x faster and picks a winner that differs by one complaint and costs 0.056 min once
+   re-scored properly, which is three seconds of wait. So the search runs coarse and the RESULT
+   is always re-scored at full fidelity before anything is shown or applied.
+
+   That leaves one way to be wrong — a coarse winner that is genuinely worse than what you
+   already had — and finishOpt() closes it: both are re-scored exactly, and if the winner does
+   not beat your own lane the optimiser changes NOTHING and says so. */
+const OPT_DAYS = 150, OPT_SEEDS = [11, 12];
+function optScore(mode, A, R, pick, bed, exact){
+  const hasR = MODES.find(m=>m.id===mode).hasR;
+  const cc  = pick.size ? [...pick].sort((a,b)=>a-b).join(".") : "-";
+  const bcc = bed.size  ? [...bed ].sort((a,b)=>a-b).join(".") : "-";
+  const k = [mode,A,hasR?R:0,cc,bcc,exact?"x":"c"].join("|");
+  if(optCache.has(k)) return optCache.get(k);
+  const v = evaluate({mode, A, R:hasR?R:0, cyc:S.cyc, assess:S.assess, assessNo:S.assessNo,
+    fastDischarge:S.fastDischarge, bedcc:bcc, bedExtra:S.bedExtra, bedIntp:S.bedIntp,
+    bedGrp:S.bedGrp, turnRoom:S.turnRoom, turnChair:S.turnChair, roomsA:S.roomsA,
+    loadPct:S.loadPct, docs:S.docs, capPerDoc:S.capPerDoc, cc,
+    start:S.start, len:S.len, bar:S.bar,
+    days: exact ? 600 : OPT_DAYS, seeds: exact ? [11,12,13,14] : OPT_SEEDS},
+    LEVELS[S.level].pts).score;
+  optCache.set(k, v);
+  OPT.done++;
+  /* ⚠ MOVE THE BAR, DO NOT REBUILD THE PANEL. This called drawOpt(), which rewrites the
+     panel's innerHTML and rebinds its button on every tick — a forced layout inside the
+     search loop, and it cost 240ms per simulation against 30ms of actual work. Touch the
+     two nodes that changed. */
+  if(OPT.on && OPT.done % 4 === 0) optTick();
+  return v;
+}
+/* ⚠ YIELD ON ELAPSED TIME, NOT ON A COUNT. Yielding every N simulations sounds equivalent and
+   is not: a background tab clamps setTimeout to about ONE PER SECOND, so a fixed every-6
+   schedule turned a sub-second search into forty. Slicing by the clock keeps the page
+   responsive at ~50ms granularity and costs a handful of yields however slow the machine. */
+let optLastYield = 0;
+const yieldFrame = () => new Promise(r => setTimeout(r, 0));
+async function optSlice(){
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  if(now - optLastYield < 50) return;
+  optLastYield = now;
+  await yieldFrame();
+}
+
+async function optimise(){
+  OPT.on = true; OPT.stop = false; OPT.done = 0; OPT.result = null; OPT.noGain = null;
+  optLastYield = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  optCache.clear();
+  const hasR0 = modeOf().hasR;
+  OPT.prev = {mode:S.mode, A:S.A, R:S.R, pick:new Set(PICK), bed:new Set(BEDPICK),
+              score:LAST_SCORE};
+  const TOTAL = S.A + (hasR0 ? S.R : 0);
+  const IDS = CC.map(x=>x.i);
+  const CCPASS = 4, BEDPASS = 3;
+  OPT.total = 2*(1 + 3*(TOTAL+1)) + CCPASS*IDS.length + BEDPASS*BED_IDS.length;
+
+  let best = {mode:S.mode, A:S.A, R:hasR0?S.R:0, pick:new Set(PICK), bed:new Set(BEDPICK)};
+  let bestV = optScore(best.mode, best.A, best.R, best.pick, best.bed);
+
+  /* shape: every layout, and every way of dividing the SAME estate between the two sides */
+  const shape = async () => {
+    OPT.phase = "trying every arrangement of your " + TOTAL + " spaces";
+    for(const m of MODES){
+      const opts = m.hasR ? Array.from({length:TOTAL}, (_,i)=>[i+1, TOTAL-i-1])
+                          : [[TOTAL, 0]];
+      for(const [A,R] of opts){
+        if(OPT.stop) return;
+        if(A < 1) continue;
+        const v = optScore(m.id, A, R, best.pick, best.bed);
+        if(v < bestV - 1e-9){ bestV = v; best = {...best, mode:m.id, A, R} }
+      }
+      await optSlice();
+    }
+  };
+  await shape();
+  if(OPT.stop) return finishOpt();
+
+  /* complaints: flip one at a time, keep the best flip, repeat while it still pays */
+  OPT.phase = "trying each complaint in and out of the lane";
+  for(let pass=0; pass<CCPASS && !OPT.stop; pass++){
+    let bestFlip = null, bestFlipV = bestV;
+    for(const i of IDS){
+      if(OPT.stop) break;
+      const trial = new Set(best.pick);
+      trial.has(i) ? trial.delete(i) : trial.add(i);
+      if(!trial.size) continue;                       // a lane that takes nobody is not an answer
+      const v = optScore(best.mode, best.A, best.R, trial, best.bed);
+      if(v < bestFlipV - 1e-9){ bestFlipV = v; bestFlip = trial }
+      await optSlice();
+    }
+    if(!bestFlip) break;
+    best.pick = bestFlip; bestV = bestFlipV;
+  }
+  if(OPT.stop) return finishOpt();
+
+  /* who must have a room — only meaningful in a layout that HAS rooms and chairs */
+  if(best.mode === "bedfirst" || best.mode === "stream"){
+    OPT.phase = "trying who needs a room rather than a chair";
+    for(let pass=0; pass<BEDPASS && !OPT.stop; pass++){
+      let bestFlip = null, bestFlipV = bestV;
+      for(const i of BED_IDS){
+        if(OPT.stop) break;
+        const trial = new Set(best.bed);
+        trial.has(i) ? trial.delete(i) : trial.add(i);
+        const v = optScore(best.mode, best.A, best.R, best.pick, trial);
+        if(v < bestFlipV - 1e-9){ bestFlipV = v; bestFlip = trial }
+        await optSlice();
+      }
+      if(!bestFlip) break;
+      best.bed = bestFlip; bestV = bestFlipV;
+    }
+  }
+  if(OPT.stop) return finishOpt();
+
+  /* the criteria changed what the lane sees, so the shape is worth re-checking against it */
+  await shape();
+  OPT.result = {...best, score:bestV};
+  return finishOpt();
+}
+function finishOpt(){
+  OPT.on = false;
+  if(OPT.result){
+    const p = OPT.prev;
+    /* re-score BOTH exactly — the search ran coarse, so its numbers are not the ones anyone
+       is shown, and a coarse winner that is really worse must not be applied */
+    const mine  = optScore(p.mode, p.A, p.R, p.pick, p.bed, true);
+    const found = optScore(OPT.result.mode, OPT.result.A, OPT.result.R,
+                           OPT.result.pick, OPT.result.bed, true);
+    OPT.prev.score = mine;
+    if(found < mine - 1e-9){
+      OPT.result.score = found;
+      S.mode = OPT.result.mode; S.A = OPT.result.A; S.R = OPT.result.R;
+      PICK = new Set(OPT.result.pick); BEDPICK = new Set(OPT.result.bed);
+    } else {
+      OPT.result = null;      // nothing better; leave the operator's lane exactly as it was
+      OPT.noGain = mine;
+    }
+  }
+  run();          // redraws everything, including this panel
+}
+
 function run(){
   const m=modeOf(), lvl=LEVELS[S.level];
   const cfg = {mode:S.mode, A:S.A, R:S.R, cyc:S.cyc, assess:S.assess, fastDischarge:S.fastDischarge,
@@ -2896,7 +3159,7 @@ function run(){
                              // patients, the quantity the ceiling is expressed in — `peak`
                              // is spaces in use and reads high in a layout that moves people
                           // the SAVED row against it — the save path had no test at all
-  drawSpeed(m); drawTurn(); drawWindow(); syncWindow();
+  drawSpeed(m); drawTurn(); drawWindow(); syncWindow(); drawOpt();
   $("speedCtl").querySelectorAll("[data-fd]").forEach(bt=>bt.onclick=()=>{
     S.fastDischarge = bt.dataset.fd==="1"; run() });
 

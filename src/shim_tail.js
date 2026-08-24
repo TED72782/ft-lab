@@ -7,13 +7,16 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 107;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 112;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
   if(/: *(yes|FAIL|ok)/.test(t + " " + String(a[1] ?? ""))){ CHECKS++; LAST = t.trim() }
   _log(...a); };
-setTimeout(()=>{ try{
+/* async: the optimiser yields between slices, so its guards must be able to await it. The
+   try/catch/finally below is unchanged — a rejection still reports as an ABORT with the
+   check it died after, and the count line still prints. */
+setTimeout(async ()=>{ try{
   S.mode="split";S.A=6;S.R=4;S.start=15;S.len=8;S.assess=44;S.fastDischarge=true;S.level=1;
   PICK=new Set(CC.map(x=>x.i)); run(); buildTrace();
   /* ⚠ SWEEP THE RUN, DO NOT SAMPLE ONE MINUTE. These four read the stage at t=300 and printed
@@ -1569,6 +1572,84 @@ setTimeout(()=>{ try{
         : "FAIL — off \"" + off + "\" / \"" + offEff.slice(0,50) + "\", on \"" + on
           + "\" / \"" + onEff.slice(0,60) + "\", two \"" + two + "\"");
     S.capPerDoc=0; S.docs=1; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8;
+  }
+
+
+  /* ── the optimiser (2026-08-23) ───────────────────────────────────────────────────────── */
+  {
+    S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; S.level=1; S.docs=1; S.capPerDoc=0;
+    S.assess=44; S.assessNo=44; S.loadPct=100; S.turnRoom=10; S.turnChair=1;
+    S.fastDischarge=false; PICK=new Set(CC.map(x=>x.i)); BEDPICK=new Set(BED_IDS); run();
+    const MINE = {mode:S.mode, A:S.A, R:S.R, start:S.start, len:S.len, level:S.level,
+                  docs:S.docs, capPerDoc:S.capPerDoc, assess:S.assess, assessNo:S.assessNo,
+                  loadPct:S.loadPct, turnRoom:S.turnRoom, turnChair:S.turnChair,
+                  fastDischarge:S.fastDischarge, score:LAST_SCORE,
+                  total:S.A + (modeOf().hasR ? S.R : 0)};
+    await optimise();
+
+    /* IT MUST NEVER HAND BACK A WORSE LANE. The search runs coarse (150 days x 2 seeds) for
+       speed, so its own numbers are approximate — the guarantee is that both the old lane and
+       the found one are re-scored EXACTLY before anything is applied, and the operator's lane
+       wins ties. Without that, a coarse fluke could quietly make someone's lane worse. */
+    console.log("the optimiser never returns a worse lane than yours:",
+      LAST_SCORE <= MINE.score + 1e-9
+        ? "yes (" + MINE.score.toFixed(2) + " -> " + LAST_SCORE.toFixed(2) + ")"
+        : "FAIL — yours " + MINE.score.toFixed(2) + ", it applied " + LAST_SCORE.toFixed(2));
+
+    /* IT MUST NOT TOUCH WHAT YOU CHOSE. The whole premise is "given my hours and timing, fix
+       the layout" — an optimiser that quietly lengthened the day or added a provider would be
+       answering a different question and would look like a much better result. */
+    const moved = ["start","len","level","docs","capPerDoc","assess","assessNo","loadPct",
+                   "turnRoom","turnChair","fastDischarge"].filter(k => S[k] !== MINE[k]);
+    console.log("the optimiser leaves your hours and timing alone:",
+      moved.length === 0 ? "yes (11 settings, none moved)"
+                         : "FAIL — it changed: " + moved.join(", "));
+
+    /* AND IT MUST NOT AWARD ITSELF MORE ESTATE. Spaces are the cheapest way to improve any
+       score, so a search free to add them would always "win" by asking for a bigger department. */
+    const nowTotal = S.A + (modeOf().hasR ? S.R : 0);
+    console.log("the optimiser keeps the estate you gave it:",
+      nowTotal === MINE.total ? "yes (" + MINE.total + " spaces in, " + nowTotal + " out)"
+        : "FAIL — " + MINE.total + " spaces in, " + nowTotal + " out");
+
+    /* PUT IT BACK has to be exact, or the operator cannot undo a search they did not want. */
+    const changed = OPT.result != null;
+    if(changed){
+      const p = OPT.prev;
+      S.mode=p.mode; S.A=p.A; S.R=p.R; PICK=new Set(p.pick); BEDPICK=new Set(p.bed); run();
+      console.log("put it back restores the lane exactly:",
+        S.mode===MINE.mode && S.A===MINE.A && S.R===MINE.R
+          && Math.abs(LAST_SCORE-MINE.score) < 1e-9
+          ? "yes (" + MINE.mode + " " + MINE.A + "+" + MINE.R + " at " + MINE.score.toFixed(2) + ")"
+          : "FAIL — back to " + S.mode + " " + S.A + "+" + S.R + " at " + LAST_SCORE.toFixed(2));
+    } else {
+      console.log("put it back restores the lane exactly:",
+        "yes (nothing was changed, so there is nothing to undo)");
+    }
+    S.mode="split"; S.A=6; S.R=4; PICK=new Set(CC.map(x=>x.i)); BEDPICK=new Set(BED_IDS);
+  }
+  {
+    /* ⚠ AND TEST THE GUARANTEE DIRECTLY, NOT BY HOPING. The end-to-end check above passes even
+       with the exact re-check deleted, because the coarse winner usually IS better — so it
+       cannot see the one failure it exists to prevent. Hand finishOpt a deliberately WORSE
+       "winner" and require it to refuse. */
+    S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; S.level=1; S.docs=1;
+    PICK=new Set(CC.map(x=>x.i)); BEDPICK=new Set(BED_IDS); run();
+    const mineScore = LAST_SCORE, mineLane = S.mode + " " + S.A + "+" + S.R;
+    OPT.prev = {mode:S.mode, A:S.A, R:S.R, pick:new Set(PICK), bed:new Set(BEDPICK),
+                score:mineScore};
+    OPT.result = {mode:"stream", A:1, R:9, pick:new Set(PICK), bed:new Set(BEDPICK), score:-99};
+    OPT.noGain = null;
+    finishOpt();
+    const kept = S.mode + " " + S.A + "+" + S.R;
+    console.log("a worse 'winner' is refused, not applied:",
+      kept === mineLane && OPT.result === null && OPT.noGain != null
+        ? "yes (kept " + kept + " at " + mineScore.toFixed(2)
+          + "; the losing candidate claimed -99 and was re-scored)"
+        : "FAIL — lane now " + kept + ", result " + (OPT.result ? "applied" : "null")
+          + ", noGain " + OPT.noGain);
+    OPT.result = null; OPT.prev = null; OPT.noGain = null;
+    S.mode="split"; S.A=6; S.R=4; run();
   }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
