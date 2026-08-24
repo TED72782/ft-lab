@@ -37,7 +37,7 @@
 body{margin:0;background:var(--ground);color:var(--ink);
   font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1180px;margin:0 auto;padding:28px 22px 64px}
+.wrap{max-width:1260px;margin:0 auto;padding:28px 22px 64px}
 h1,h2,h3{font-family:Archivo,system-ui,sans-serif;font-weight:700;text-wrap:balance;margin:0}
 .eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;font-weight:500;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
@@ -96,7 +96,7 @@ header p{margin:0;color:var(--ink-2);max-width:64ch}
 .tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;
   border-color:var(--line);background:var(--surface)}
 .tabs button:focus-visible{outline:2px solid var(--hold);outline-offset:2px}
-#tabNotes{max-width:760px}
+#tabNotes{max-width:700px}
 #tabNotes h3{margin:22px 0 8px}
 #tabNotes h2{font-size:15px;letter-spacing:.02em;margin:0 0 12px;color:var(--ink-2);
   text-transform:uppercase}
@@ -231,7 +231,9 @@ input[type=range]:focus-visible{outline:2px solid var(--hold);outline-offset:3px
 .stage-bar span{display:block;height:100%;background:var(--hold);width:0}
 .stage-body{display:grid;grid-template-columns:1.15fr 1fr 1fr .6fr;gap:18px;padding:16px}
 @media (max-width:860px){.stage-body{grid-template-columns:1fr 1fr}}
-.zone-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px}
+.zone-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px;
+  min-height:32px;min-height:2lh}   /* two lines always: one-line headings otherwise
+     lift their slot row 16px above the wrapped one, which reads as a broken grid */
 .wait-pool{display:flex;flex-wrap:wrap;gap:6px 5px;align-content:flex-start;min-height:74px}
 .slots{display:flex;flex-wrap:wrap;gap:6px}
 .slot{width:30px;height:30px;border-radius:7px;border:1.5px dashed var(--line);
@@ -301,11 +303,22 @@ input[type=range]:focus-visible{outline:2px solid var(--hold);outline-offset:3px
 .note{margin-top:22px;padding:16px 18px;background:var(--surface-2);border:1px solid var(--line-soft);
   border-radius:10px;font-size:13.5px;color:var(--ink-2)}
 .note h3{font-size:14px;margin-bottom:8px;color:var(--ink)}
+.note .crit-f{padding:0;max-width:none}   /* it carries the lab panel's edge padding; inside a note
+     card that double-pads and indents the body away from its own heading. Its 88ch cap
+     goes too: inside a fixed-width stack it gave two of the eight cards a visibly
+     shorter line than the rest. The measure is set once, by the column. */
 .note ul{margin:0;padding-left:18px} .note li{margin:5px 0}
 .note b{color:var(--ink);font-weight:600}
 footer{margin-top:26px;font-size:12.5px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:14px}
 /* its own line: run into the sentence above and "…by taking fewer. shared board — everyone
    using this link sees the same list" reads as one claim about scoring */
 .board-tag{display:block;margin-top:6px;font-style:italic}
+/* Last-line widows: measured 10 on the page, two of them a three-word tail alone.
+   `pretty` costs nothing and degrades to normal wrapping where unsupported.
+   `balance` is for short blocks only — the spec caps it at a few lines — so it goes
+   on headings and the KPI captions, never on running prose. */
+p,li,.hint,.crit-hint,.crit-sum,.crit-f,.stage-f,.stage-sub,.board-note,.dim,.s,.anote,.ahint{text-wrap:pretty}
+h1,h2,h3,.eyebrow,.zone-h,.t,.stat .k{text-wrap:balance}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
