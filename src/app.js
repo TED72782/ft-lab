@@ -1344,8 +1344,8 @@ function drawSpeed(m){
         actually tied up for at this setting, measured from the run rather than scaled off the
         dial. It is the space's own clock &mdash; it starts when the patient sits down, so waiting
         for a space is not in it. What is in it, besides care, is the <b>wait to be seen</b>: that
-        happens in the chair, and it does not speed up when care does, which is why this figure
-        stops falling before the dial does.</div></div>`;
+        happens in the chair and does not speed up when care does. It is the lower limit on this
+        figure.</div></div>`;
     $("cyc").oninput = e => { S.cyc = +e.target.value; syncSpeed(m); requestRun() };
     return syncSpeed(m);
   }
