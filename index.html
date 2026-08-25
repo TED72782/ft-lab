@@ -851,6 +851,16 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
    moves every published comparison between the layouts. It needs an operator's answer first. */
 function sim(cfg){
   let qSum = 0, qN = 0, hSum = 0, hN = 0;   // provider-queue and space-hold accumulators
+  /* violations of "nobody moves before the doctor reaches them", counted rather than
+     inferred. The aggregate score cannot show this — the floor is PER PATIENT, so a lane
+     whose MEAN queue exceeds the slider still has plenty of patients the slider governs,
+     and two different guards built on aggregate behaviour both passed with the floor
+     removed. Count the thing the invariant is about. */
+  let movedEarly = 0, movedN = 0, qAtMove = 0;
+  /* qAtMove is summed from the SAME lastQ the floor uses, and is asserted against docWait,
+     which docQueue() accumulates independently. Without that cross-check the counter is
+     self-referential — forcing lastQ to 0 makes both the floor and the violation count
+     agree on nothing happening, and a mutation doing exactly that passed. */
   const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0,
@@ -992,8 +1002,13 @@ function sim(cfg){
         docFree[i] = start + expo(r, 1/(docMin * (load ? load[hb(t)] : 1)));
         qSum += start - t; qN++;
         return start - t; };
+      /* the queue this patient personally waited, kept so the MOVE can be floored at it —
+         see the assessMin floor below */
+      let lastQ = 0;
       const holdOf = (t, w, raw) => {
-        const v = docs ? docQueue(t) + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) : raw;
+        const q = docs ? docQueue(t) : 0;
+        lastQ = q;
+        const v = docs ? q + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) : raw;
         hSum += v; hN++;                 // exposed so the no-double-count property is testable
         return v; };
       /* ⚠ THE PROCESS FLOOR IS TWO PARTS. `floor` is arrival -> triage; `floorRoom` is triage ->
@@ -1035,7 +1050,16 @@ function sim(cfg){
            an order of magnitude more than the gaps between the layouts this page compares. */
         /* the assessment point is no longer scaled by department load either: that multiplier
            moved onto the provider, where the data puts it */
-        const a = Math.min((w ? assessMin : (assessNo ?? assessMin)) ?? D.g.asw, total-1);
+        /* ⚠ NOBODY MOVES BEFORE THE DOCTOR REACHES THEM (operator, 2026-08-24). assessMin is
+           measured from ROOMING, and the hold already contains the wait for a provider — so on a
+           single-provider 8+10 lane the average patient waited 49 min to be seen and was moved
+           out of the assessment space at 44, five minutes BEFORE being assessed, into an area
+           called "results pending" with no results pending. That frees the assessment side with
+           a patient who was never assessed and flatters its throughput. Floored at this patient's
+           own queue. With no provider modelled (docs=0) lastQ is 0 and this is the old line. */
+        const a = Math.min(Math.max(lastQ, (w ? assessMin : (assessNo ?? assessMin)) ?? D.g.asw),
+                           total-1);
+        movedN++; qAtMove += lastQ; if(a < lastQ - 1e-9) movedEarly++;
         second[tag] = Math.max(1, total-a);
         ev.push([t+a,1,tag]) };
       const startB = (t,tag) => { rb++;
@@ -1256,7 +1280,8 @@ function sim(cfg){
                     divPct:0, saturated:false, idle:true, peak:0};
   const byHour=[]; for(let h=0;h<H;h++) byHour.push(hn[h] ? hs[h]/hn[h] : 0);
   const worst = Math.max.apply(null, byHour);
-  return {docWait: qN ? qSum/qN : 0, holdMean: hN ? hSum/hN : 0, wa: waN ? wa/waN : 0, perArrival: (wa+wr+divWait)/arrN, wr: nw?wr/nw:0, stuck: nw?100*blocked/nw:0,
+  return {movedEarly, movedN, qAtMove: movedN ? qAtMove/movedN : 0,
+          docWait: qN ? qSum/qN : 0, holdMean: hN ? hSum/hN : 0, wa: waN ? wa/waN : 0, perArrival: (wa+wr+divWait)/arrN, wr: nw?wr/nw:0, stuck: nw?100*blocked/nw:0,
           byHour, worst, worstIdx: byHour.indexOf(worst),
           seen: seen/runs, arrived: arrN/runs, diverted: divN/runs,
           divByHour: [...divH].map(v=>v/runs),
@@ -2258,11 +2283,15 @@ function drawSpeed(m){
       <output class="num" id="asxOut"></output></div>
     <input type="range" id="asx" min="10" max="90" step="1" value="${S.assess}">
     <div class="hint">How long a patient keeps an assessment space before moving to the second
-      area. <b>Nothing in the record marks it.</b> What is recorded is either side of it: the
-      doctor arrives about ${D.band ? D.band.doc.toFixed(0) : "20"} min after rooming, and the
-      decision is entered about ${D.band ? D.band.dispo.toFixed(0) : "60"}. Assessment finishes
-      somewhere between the two, so this is a number to argue about rather than look up &mdash;
-      and the best split follows whatever you set.
+      area. <b>Nothing in the record marks it.</b> What is recorded is either side of it${
+        /* ⚠ NO FALLBACK NUMBERS. This read `D.band ? D.band.doc : "20"`, so a data file without
+           a band would have printed "about 20 min ... about 60" in the voice of a measurement —
+           invented figures that look measured, which is the failure this whole page keeps
+           finding. If the measurement is absent, the sentence simply does not claim one. */
+        D.band ? `: the doctor arrives about <b>${D.band.doc.toFixed(0)} min</b> after rooming,
+        and the decision is entered about <b>${D.band.dispo.toFixed(0)}</b>` : ""}. Assessment
+      finishes between the doctor arriving and the decision being entered, so this is a number to
+      argue about rather than look up &mdash; and the best split follows whatever you set.
       <span id="asxBoth"></span></div></div>`
     /* The no-test half is its own control, and only where it can bite: it does nothing unless
        patients actually move on, so it is drawn under the fastDischarge toggle rather than beside

@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 125;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 126;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1931,6 +1931,37 @@ setTimeout(async ()=>{ try{
       D.tot && Math.abs(drawn - meas) < 3
         ? "yes (curve " + drawn.toFixed(1) + " against a measured " + meas.toFixed(1) + ")"
         : "FAIL — curve " + drawn.toFixed(1) + " vs measured " + meas.toFixed(1));
+  }
+
+
+  {
+    /* ⚠ NOBODY MOVES BEFORE THE DOCTOR REACHES THEM (operator, 2026-08-24). assessMin is measured
+       from ROOMING and the hold already contains the wait for a provider, so on a single-provider
+       8+10 lane the average patient waited 49 min to be seen and was moved out of the assessment
+       space at 44 — into "results pending", with no results and no assessment. That freed the
+       assessment side with a patient nobody had seen.
+
+       The property this leaves behind is clean: once the queue exceeds the slider, the slider
+       stops mattering. Drop it far below the queue and the answer must barely move, because the
+       floor is what governs. Without the floor, lowering it keeps freeing spaces earlier and the
+       score keeps changing. */
+    const ALLCC = CC.map(x=>x.i).sort((a,b)=>a-b).join(".");
+    const at = a => evaluate({mode:"split", A:8, R:10, cyc:76, assess:a, assessNo:a,
+      fastDischarge:false, cc:ALLCC, start:11, len:9, bedcc:"-", bedExtra:0, bedIntp:false,
+      bedGrp:false, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, docs:1, capPerDoc:0,
+      perCc:true}, LEVELS[1].pts);
+    const E = at(44);
+    const early = E.o.movedEarly, n = E.o.movedN, q = E.o.docWait;
+    /* the queue seen at the move must match the queue docQueue() measured independently —
+       otherwise the counter is checking lastQ against itself and reads clean when lastQ is
+       broken, which is precisely how a mutation zeroing it passed. */
+    const qm = E.o.qAtMove, agree = q > 0 && Math.abs(qm - q)/q < 0.35;
+    console.log("a patient cannot move before the doctor has seen them:",
+      n > 100 && early === 0 && agree
+        ? "yes (0 of " + n + " moves preceded their own doctor, mean queue " + q.toFixed(0) + " min)"
+        : "FAIL — " + early + " of " + n + " moved before their doctor"
+          + (agree ? "" : "; queue at the move reads " + qm.toFixed(1)
+             + " against a measured " + q.toFixed(1) + ", so the floor is not seeing the real queue"));
   }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
