@@ -499,7 +499,7 @@ function buildTrace(){
                   : null,
                 assessNo:S.assessNo * mx.fm,
                 fastDischarge:S.fastDischarge, shr:mx.shr, lam,
-                asw:scale(D.asw, f*mx.fa), now:scale(D.now, f*mx.fo), res:scale(D.res, f*mx.fr),
+                asw:scale(D.asw, f*mx.na), now:scale(D.now, f*mx.no), res:scale(D.res, f*mx.nr),
                 days:1, trace:true};
 
   const runs = [];
@@ -754,6 +754,13 @@ let PICK = new Set(CC.map(x=>x.i));                 // everyone, until someone n
 const BARS = {today: {m24:D.main24, mean:D.main_mean, n:"today's arrangement"}};
 const bar = () => BARS[S.bar] || BARS.today;
 
+/* ⚠ TWO DIVISORS, DELIBERATELY. D.g.* are the measured ANCHORS a physician reads; D.norm.* are
+   the means of the CURVES the engine draws. They differ once a curve is rescaled, and dividing a
+   rescaled curve by an un-rescaled anchor silently breaks the a+r partition — see the pipeline.
+   Scaling uses norm; the sizing banner uses fa/fr against the anchors and must keep doing so. */
+const NASW = (D.norm && D.norm.asw) || D.g.asw,
+      NRES = (D.norm && D.norm.res) || D.g.res,
+      NNOW = (D.norm && D.norm.now) || D.g.now;
 function mix(){
   const sel = CC.filter(x=>PICK.has(x.i));
   const s = sel.reduce((a,x)=>a+x.s, 0);
@@ -762,6 +769,7 @@ function mix(){
   return {share:s, n:sel.length,
           shr: wsum("w"),
           fa: wsum("a")/D.g.asw,                    // scale factors onto the shared shapes
+          na: wsum("a")/NASW, nr: wsum("r")/NRES, no: wsum("o")/NNOW,   // ...for the CURVES
           fr: wsum("r")/D.g.res,
           fo: wsum("o")/D.g.now,
           fm: D.g.dd ? wsum("dd")/D.g.dd : 1};  // how long this mix's no-test patients hold a doctor
@@ -881,8 +889,8 @@ function evaluate(cfg, dayTotal){
               factor gives NaN, and a NaN reaches the board as a blank score. */
            assessNo: assessNoEff,
            load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
-           asw:scale(D.asw, f*w("a")/D.g.asw), now:scale(D.now, f*w("o")/D.g.now),
-           res:scale(D.res, f*w("r")/D.g.res), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
+           asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
+           res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
 
   // Everyone the lane does not serve is charged the main department for THEIR arrival hour:
   // the whole of every hour outside the window, and the criteria-excluded share of every hour
