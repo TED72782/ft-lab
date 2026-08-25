@@ -123,6 +123,15 @@ function sim(cfg){
 
          With ccMix, each patient draws a complaint once on arrival and it decides all three:
          their own test rate, whether they need a room, and a multiplier on their own service
+         ⚠ AND THE PER-COMPLAINT DURATIONS CARRY A KNOWN BIAS (corrected here 2026-08-24).
+         `a` is not measured — it is to_order plus an assumed 25 min, and to_order DROPS
+         triage-protocol orders: 74% of Ankle's test patients, 66% of Finger's, 0% of Eye's.
+         corr(drop rate, a) = -0.857 against corr(test rate, a) = -0.652, so the drop rate
+         explains `a` better than the test rate does. The commit adding this justified its ~1.1%
+         aggregate shift as CORRECTING a bias; it may be IMPORTING one. The shift is arithmetic
+         and real, the story attached to it is withdrawn, and anything whose MAGNITUDE rests on
+         per-complaint `a` is provisional. See CLAUDE.md.
+
          time. The multipliers are MEAN 1 by construction — each is that complaint's duration
          over the volume-weighted mean already baked into the curve — so the aggregate is
          unchanged and only the BETWEEN-complaint variance is added. That variance is the whole
