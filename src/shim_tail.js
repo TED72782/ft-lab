@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 123;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 125;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1891,6 +1891,46 @@ setTimeout(async ()=>{ try{
         ? "yes (corr with arrivals " + r.toFixed(2) + " — busy hours are the FAST ones, the "
           + "opposite of what crowding does)"
         : "FAIL — corr with arrivals " + r.toFixed(2) + ", so it may be tracking load");
+  }
+
+
+  /* ── one curve for a test patient's stay (2026-08-24) ─────────────────────────────────── */
+  {
+    const ALLCC = CC.map(x=>x.i).sort((a,b)=>a-b).join(".");
+    const run = () => evaluate({mode:"pooled", A:40, R:0, cyc:76, assess:44, assessNo:44,
+      fastDischarge:false, cc:ALLCC, start:0, len:24, bedcc:"-", bedExtra:0, bedIntp:false,
+      bedGrp:false, turnRoom:0, turnChair:0, roomsA:false, loadPct:0, docs:0, capPerDoc:0,
+      perCc:true}, LEVELS[1].pts).o.holdMean;
+
+    /* ⚠ THE ASSESSMENT BOUNDARY MUST NO LONGER REACH THE MODEL. `a` = to_order + POST_ORDER_MIN
+       carried two things that needed permanent caveats: POM is an assumed 25 min nobody measured,
+       and `a` is defined only on the 79% of test patients whose first order fell inside the stay.
+       They only ever entered as a+r, and the point a patient MOVES is the slider, so the split
+       bought nothing. Corrupt both halves beyond recognition: with `tot` present the answer must
+       not move at all. If it does, the boundary is still load-bearing and the caveats stand. */
+    const base = run();
+    const sA = D.asw.slice(), sR = D.res.slice();
+    for(let i=0;i<D.asw.length;i++){ D.asw[i] *= 3; D.res[i] *= 0.2 }
+    const wrecked = run();
+    for(let i=0;i<D.asw.length;i++){ D.asw[i] = sA[i]; D.res[i] = sR[i] }
+    console.log("the assessment boundary no longer reaches the model:",
+      Math.abs(wrecked - base) < 1e-9
+        ? "yes (asw x3 and res x0.2 leave a test patient's stay at " + base.toFixed(2) + ")"
+        : "FAIL — wrecking the two halves moved it " + base.toFixed(2) + " -> "
+          + wrecked.toFixed(2) + ", so POST_ORDER_MIN and the filtered boundary still matter");
+
+    /* and the single curve must reproduce the MEASURED occupancy, test-weighted */
+    const tw = CC.reduce((a,c)=>a+c.s*c.w, 0);
+    const meas = CC.reduce((a,c)=>a+c.s*c.w*(c.t != null ? c.t : c.a+c.r), 0)/tw;
+    const E = evaluate({mode:"pooled", A:40, R:0, cyc:76, assess:44, assessNo:44,
+      fastDischarge:false, cc:ALLCC, start:0, len:24, bedcc:"-", bedExtra:0, bedIntp:false,
+      bedGrp:false, turnRoom:0, turnChair:0, roomsA:false, loadPct:0, docs:0, capPerDoc:0,
+      perCc:true}, LEVELS[1].pts);
+    const drawn = D.tot ? D.tot.reduce((a,b)=>a+b,0)/D.tot.length * (E.o.seen>0?1:1) : 0;
+    console.log("the single curve carries the measured occupancy:",
+      D.tot && Math.abs(drawn - meas) < 3
+        ? "yes (curve " + drawn.toFixed(1) + " against a measured " + meas.toFixed(1) + ")"
+        : "FAIL — curve " + drawn.toFixed(1) + " vs measured " + meas.toFixed(1));
   }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
