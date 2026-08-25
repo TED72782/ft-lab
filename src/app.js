@@ -47,7 +47,8 @@ function sim(cfg){
   let qSum = 0, qN = 0, hSum = 0, hN = 0;   // provider-queue and space-hold accumulators
   const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
-         shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0} = cfg;
+         shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0,
+         ccMix=null} = cfg;
   /* ⚠ HOW MANY PATIENTS ONE PROVIDER WILL HOLD AT ONCE — a POLICY ceiling, like the acuity
      ratios, not a measured quantity. `ab+rb` is every patient occupying a space and the engine
      already calls that "the physician's concurrent load"; this refuses to seat past
@@ -113,6 +114,28 @@ function sim(cfg){
       const bedReq = (bedFirst || stream) ? new Uint8Array(arr.length) : null;
       const slotA = T ? new Int16Array(arr.length).fill(-1) : null;
       const slotB = T ? new Int16Array(arr.length).fill(-1) : null;
+      /* ⚠ WHO THE PATIENT IS. Without ccMix every patient is identical: test-need is one coin
+         flip at `shr`, room-need another at `bedShare`, and the duration curves are pooled. The
+         two flips are INDEPENDENT, so the patients sent to rooms are a random sample and no
+         slower than anyone else — which makes any routing rule provably useless, and looks like
+         a finding about the department when it is a property of the model. (It was reported as
+         one, 2026-08-24.)
+
+         With ccMix, each patient draws a complaint once on arrival and it decides all three:
+         their own test rate, whether they need a room, and a multiplier on their own service
+         time. The multipliers are MEAN 1 by construction — each is that complaint's duration
+         over the volume-weighted mean already baked into the curve — so the aggregate is
+         unchanged and only the BETWEEN-complaint variance is added. That variance is the whole
+         point: it is what a sorting rule can act on. */
+      const ccOf = ccMix ? new Int16Array(arr.length) : null;
+      const drawCc = () => { if(!ccMix) return -1;
+        const u = r(); let k = 0;
+        while(k < ccMix.length - 1 && u > ccMix[k].p) k++;
+        return k };
+      const CCM = i => (ccMix && i >= 0) ? ccMix[i] : null;
+      if(ccOf) for(let i=0;i<arr.length;i++) ccOf[i] = drawCc();
+      /* drawn for everyone up front so the stream is identical whatever order they seat in;
+         guarded on ccOf so the no-table path draws NOTHING and stays bit-identical */
       let ab=0, rb=0, peak=0, pkA=0, pkB=0;
       /* ⚠ PATIENTS, NOT SPACES. `ab+rb` counts spaces IN USE, and during a split's move the
          patient is already in the second area while the assessment space is still being
@@ -172,7 +195,8 @@ function sim(cfg){
 
       const startA = (t,tag) => { ab++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
-        const w = r()<shr;
+        const C = CCM(ccOf ? ccOf[tag] : -1);
+        const w = r() < (C ? C.w : shr);
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
         /* ⚠ THE CROWDING MULTIPLIER DELAYS THE START OF CARE, NOT CARE ITSELF — corrected
            once the queue above existed, and the correction is the operator's question answered.
@@ -181,7 +205,8 @@ function sim(cfg){
            whole hold +3.68% (t=4.6), queue +15.4% (t=10.6), post-doctor hold +0.49% (t=0.50).
            Department load does not slow CARE at all; it slowed the thing the engine now models
            explicitly, so scaling here was double-counting. It moved to docMin above. */
-        const total = holdOf(t, w, w ? pick(r,asw)+pick(r,res) : pick(r,now));
+        const total = holdOf(t, w, w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
+                                     : pick(r,now)*(C?C.mo:1));
         if(pooled){ second[tag]=0; ev.push([t+total,1,tag]); return }
         if(!w && !fastDischarge){ second[tag]=0; ev.push([t+total,1,tag]); return }
         /* ⚠ THE TWO HALVES ARE ASSESSED SEPARATELY. `assessMin` is measured on patients who HAD
@@ -251,9 +276,11 @@ function sim(cfg){
          first and not here, and the bed-first-at-0%-equals-pooled invariant caught it immediately
          (29.71 against 34.08) — the two branches are meant to be the same lane under a rule that
          is inert at zero, so anything applied to one and not the other separates them. */
-      const draw = (tag, t) => { const w = r()<shr;
+      const draw = (tag, t) => { const C = CCM(ccOf ? ccOf[tag] : -1);
+        const w = r() < (C ? C.w : shr);
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        return holdOf(t, w, w ? pick(r,asw)+pick(r,res) : pick(r,now)) };
+        return holdOf(t, w, w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
+                              : pick(r,now)*(C?C.mo:1)) };
       const startBed = (t,tag) => { ab++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         second[tag]=0; ev.push([t+draw(tag,t),1,tag]) };
@@ -341,7 +368,13 @@ function sim(cfg){
                            into separate chairs across the lane, so arriving with a sibling is a
                            bed-required rule in its own right and not a share to be added. The
                            draw is kept for everyone else. */
-                        bedReq[tag] = (bedGrp && gsz[tag] > 1) || r() < bedShare ? 1 : 0;
+                        /* the complaint decides first; the interpreter and flat-extra shares
+                           then apply to whoever it leaves behind, exactly as bedShareOf composes
+                           them. Without ccMix this is the original single draw. */
+                        { const _C = CCM(ccOf ? ccOf[tag] : -1);
+                          bedReq[tag] = (bedGrp && gsz[tag] > 1) ? 1
+                            : _C ? (_C.bed || r() < _C.res2 ? 1 : 0)
+                                 : (r() < bedShare ? 1 : 0); }
                         /* ⚠ the flag rides along AFTER it is drawn — pushed before, it recorded
                            the previous patient's value. It exists so the seating rule is
                            observable from outside: a room-required patient must never end up in
@@ -766,6 +799,24 @@ function evaluate(cfg, dayTotal){
   const sel = CC.filter(x=>keep.has(x.i)), share = sel.reduce((a,x)=>a+x.s,0);
   const w = k => share ? sel.reduce((a,x)=>a+x.s*x[k],0)/share : 1;
 
+  /* ⚠ THE PER-COMPLAINT TABLE. Multipliers are that complaint's own duration over the
+     volume-weighted mean ALREADY baked into the pooled curve, so each has mean 1 across the
+     accepted mix and the aggregate is untouched — only the between-complaint spread is added.
+     `res2` is the interpreter-plus-extra share that applies to whoever the room list leaves
+     behind, decomposed exactly as bedShareOf composes it. */
+  const _bedKeep = cfg.bedcc === "-" ? new Set()
+                 : cfg.bedcc === undefined ? new Set(BED_IDS) : idSet(cfg.bedcc);
+  const _mA = w("a"), _mO = w("o"), _mR = w("r");
+  const _xtra = (cfg.bedExtra || 0) / 100;
+  let _cum = 0;
+  const ccMix = share > 0 ? sel.map(x => {
+    _cum += x.s / share;
+    const _i = cfg.bedIntp ? (x.x != null ? x.x : D.g.interp) : 0;
+    return {p:_cum, w:x.w, bed:_bedKeep.has(x.i) ? 1 : 0,
+            res2: _i + (1 - _i) * _xtra,
+            ma:_mA ? x.a/_mA : 1, mo:_mO ? x.o/_mO : 1, mr:_mR ? x.r/_mR : 1};
+  }) : null;
+
   const lam = hours.map(h => D.lam24[h] * fac * share);      // what the lane actually sees
   const accepted = lam.reduce((a,b)=>a+b, 0);
   /* Hoisted and returned so the WIRING can be asserted. `mix().fm` is the same expression, but it
@@ -801,7 +852,7 @@ function evaluate(cfg, dayTotal){
   const o = accepted < 0.05 ? {idle:true, docWait:0, perArrival:0, wa:0, wr:0, stuck:0, worst:0, worstIdx:0,
                                byHour:hours.map(()=>0), diverted:0, divByHour:hours.map(()=>0),
                                arrived:0, seen:0, divPct:0}
-    : sim({capPerDoc:cfg.capPerDoc ?? 0,
+    : sim({capPerDoc:cfg.capPerDoc ?? 0, ccMix: cfg.perCc === false ? null : ccMix,
            A:cfg.A, R:m.hasR?cfg.R:0, pooled:cfg.mode==="pooled", bedGrp:cfg.bedGrp, ...turnFor(cfg),
            bedFirst:cfg.mode==="bedfirst", stream:cfg.mode==="stream",
            // a row saved during the brief flat-share build carries one number and no list

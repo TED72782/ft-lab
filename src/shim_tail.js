@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 116;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 119;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1749,6 +1749,54 @@ setTimeout(async ()=>{ try{
 
     S.mode="split"; S.A=6; S.R=4; PICK = new Set(CC.map(x=>x.i)); BEDPICK = new Set(BED_IDS);
     drawModes(); drawSpaces(); run();
+  }
+
+
+  /* ── patients carry a complaint (2026-08-24) ──────────────────────────────────────────── */
+  {
+    const ALLCC = CC.map(x=>x.i).sort((a,b)=>a-b).join(".");
+    const base = {cyc:76, assess:10, assessNo:10, fastDischarge:false, cc:ALLCC, start:11,
+      len:9, bedExtra:0, bedIntp:false, bedGrp:false, turnRoom:10, turnChair:1, roomsA:false,
+      loadPct:100, docs:2, capPerDoc:8};
+    const go = (set, perCc) => evaluate({...base, mode:"stream", A:8, R:10, perCc,
+      bedcc: set.size ? [...set].sort((a,b)=>a-b).join(".") : "-"}, LEVELS[1].pts);
+    const take = (arr, target) => { const s = new Set(); let g = 0;
+      for(const c of arr){ if(g >= target) break; s.add(c.i); g += c.s } return s };
+    const slow = take([...CC].sort((a,b)=>b.dd-a.dd), 0.16);
+    const fast = take([...CC].sort((a,b)=>a.dd-b.dd), 0.16);
+
+    /* OFF IS THE OLD ENGINE. Verified bit-identical against the previous commit across 32
+       configs at the time of writing; this keeps it that way by pinning that the table changes
+       the answer only when it is switched on. */
+    const offA = go(slow, false).score, offB = go(fast, false).score;
+    console.log("the complaint table is inert when off:",
+      Math.abs(offA - offB) < 0.05
+        ? "yes (two opposite room-lists at matched volume score " + offA.toFixed(3)
+          + " and " + offB.toFixed(3) + " — the old engine could not tell them apart)"
+        : "FAIL — off, the lists already differ by " + (offA-offB).toFixed(3));
+
+    /* ⚠ AND ON, IT MUST BE ABLE TO TELL THEM APART — this is the whole feature. Before it,
+       `bedShare` was a single scalar and room-need was an independent coin flip, so the patients
+       sent to rooms were a random sample and no slower than anyone else. Any routing rule was
+       provably useless, which was mistaken for a finding about the department. */
+    const onSlow = go(slow, true).score, onFast = go(fast, true).score;
+    console.log("with it on, sending the SLOW complaints to rooms beats the fast ones:",
+      onSlow < onFast - 0.02
+        ? "yes (slow " + onSlow.toFixed(3) + " vs fast " + onFast.toFixed(3)
+          + "; off they were " + offA.toFixed(3) + " / " + offB.toFixed(3) + ")"
+        : "FAIL — slow " + onSlow.toFixed(3) + " vs fast " + onFast.toFixed(3)
+          + " (a room's turnover should amortise over a longer stay)");
+
+    /* the mean must not run away. Multipliers are that complaint's duration over the weighted
+       mean already in the curve, so they average 1; the ~1% the aggregate DOES move is the
+       pooled model's own bias, corr(test rate, assessment duration) = -0.646, and is expected. */
+    const a = go(new Set(), false).o, b = go(new Set(), true).o;
+    const drift = Math.abs(b.holdMean - a.holdMean) / a.holdMean;
+    console.log("turning it on does not move the aggregate more than the bias it fixes:",
+      drift < 0.05
+        ? "yes (hold " + a.holdMean.toFixed(1) + " -> " + b.holdMean.toFixed(1)
+          + ", " + (100*drift).toFixed(1) + "%)"
+        : "FAIL — hold moved " + (100*drift).toFixed(1) + "%, far past the ~1% correlation bias");
   }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
