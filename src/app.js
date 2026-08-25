@@ -55,7 +55,7 @@ function sim(cfg){
      which docQueue() accumulates independently. Without that cross-check the counter is
      self-referential — forcing lastQ to 0 makes both the floor and the violation count
      agree on nothing happening, and a mutation doing exactly that passed. */
-  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
+  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge, loadBeta = 0,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0,
          ccMix=null, hourMulT=null, hourMulN=null, tot=null} = cfg;
@@ -202,10 +202,23 @@ function sim(cfg){
       /* the queue this patient personally waited, kept so the MOVE can be floored at it —
          see the assessMin floor below */
       let lastQ = 0;
+      /* ⚠ THE PERSONAL-LOAD TERM GOES ON THE POST-CONTACT HALF ONLY, and that is not a
+         detail — it is what stops it double-counting the queue. Measured, the effect is on
+         `doc_to_dispo`, which starts when the doctor REACHES the patient; `docQueue` above
+         models the wait BEFORE that, which the data calls `arrival_to_doc`. Instrumenting the
+         engine (2026-08-25) confirmed the split empirically: its combined interval already
+         rises +11.6% per patient held, but its post-contact half is -0.36% (t=-1.4), i.e. flat
+         by construction, against a measured +5.7%. So the queue is present and the personal
+         slowdown was absent; applying beta to `v` as a whole would have counted the queue twice.
+         Only the no-test half is scaled: that is the population the coefficient was fit on, and
+         a test patient's interval is mostly lab turnaround, which cannot care how many patients
+         the doctor holds. loadBeta = 0 is bit-identical to the engine before this existed. */
       const holdOf = (t, w, raw) => {
         const q = docs ? docQueue(t) : 0;
         lastQ = q;
-        const v = docs ? q + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) : raw;
+        const own = loadBeta && !w && docs
+          ? Math.pow(1 + loadBeta, Math.max(0, inLane - 1) / docs) : 1;
+        const v = docs ? q + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) * own : raw;
         hSum += v; hN++;                 // exposed so the no-double-count property is testable
         return v; };
       /* ⚠ THE PROCESS FLOOR IS TWO PARTS. `floor` is arrival -> triage; `floorRoom` is triage ->
@@ -526,7 +539,7 @@ function buildTrace(){
                    bit-identical at every setting of a dial worth ~5 score points — a lane the
                    score has jamming played as one emptying. The fingerprint guard could not see
                    it: it identifies MODES, and these are numeric parameters. */
-                docs:S.docs, docMin:D.doc_min ?? 18, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
+                docs:S.docs, docMin:D.doc_min ?? 18, loadBeta:S.loadBeta ?? 0, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
                 hourMulT: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.test[(S.start+i)%24]) : null,
                 hourMulN: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.notest[(S.start+i)%24]) : null,
                 floorRoom: S.docs ? (D.floor_room ?? 0) : 0,
@@ -943,7 +956,7 @@ function evaluate(cfg, dayTotal){
               Indexed by lane-hour offset like `load`, and mean 1 over a 24h lane by construction,
               so this adds SHAPE across the day and never moves the all-day aggregate. */
            hourMulT: _hmT, hourMulN: _hmN,
-           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
+           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, loadBeta: cfg.loadBeta ?? 0, postShare: D.postdoc_share,
            tot: D.tot ? scale(D.tot, f*w("t")/NTOT) : null,
            asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
            res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
