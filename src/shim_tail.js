@@ -1765,30 +1765,42 @@ setTimeout(async ()=>{ try{
     const base = {cyc:76, assess:10, assessNo:10, fastDischarge:false, cc:ALLCC, start:11,
       len:9, bedExtra:0, bedIntp:false, bedGrp:false, turnRoom:10, turnChair:1, roomsA:false,
       loadPct:100, docs:2, capPerDoc:8};
-    const go = (set, perCc) => evaluate({...base, mode:"stream", A:8, R:10, perCc,
+    /* ⚠ TEST IT WHERE ROOMS BIND. This ran on 8+10, which carries ~9 of 18 spaces — half the
+       estate idle, so freeing room capacity buys nothing and the effect being asserted is at its
+       SMALLEST there. It measured 0.06 min, drifted to 0.013 when the occupancy data was
+       corrected, and failed the harness. Sorting is a space-allocation rule; assert it on a lane
+       that is actually short of space, where it is worth 1-3.6 min and every seed set agrees. */
+    const go = (set, perCc) => evaluate({...base, mode:"stream", A:3, R:4, perCc, capPerDoc:0,
       bedcc: set.size ? [...set].sort((a,b)=>a-b).join(".") : "-"}, LEVELS[1].pts);
     const take = (arr, target) => { const s = new Set(); let g = 0;
       for(const c of arr){ if(g >= target) break; s.add(c.i); g += c.s } return s };
     const slow = take([...CC].sort((a,b)=>b.dd-a.dd), 0.16);
     const fast = take([...CC].sort((a,b)=>a.dd-b.dd), 0.16);
 
-    /* OFF IS THE OLD ENGINE. Verified bit-identical against the previous commit across 32
-       configs at the time of writing; this keeps it that way by pinning that the table changes
-       the answer only when it is switched on. */
+    /* ⚠ THE OLD ENGINE IS NOT BLIND TO THESE LISTS, AND ASSERTING THAT IT WAS is why this
+       check broke. The two lists differ slightly in VOLUME (19.3% vs 21.3%), and volume is
+       exactly what the old engine DID respond to — on a space-bound lane that is worth 0.67 min
+       on its own. What perCc adds is sensitivity to COMPOSITION. So compare the two gaps rather
+       than demanding the old one be zero: turning the table on must make composition matter
+       several times more than volume alone did. (Bit-identical inertness is verified separately,
+       against the previous commit across 32 configs — it cannot be checked from inside one
+       build.) */
     const offA = go(slow, false).score, offB = go(fast, false).score;
-    console.log("the complaint table is inert when off:",
-      Math.abs(offA - offB) < 0.05
-        ? "yes (two opposite room-lists at matched volume score " + offA.toFixed(3)
-          + " and " + offB.toFixed(3) + " — the old engine could not tell them apart)"
-        : "FAIL — off, the lists already differ by " + (offA-offB).toFixed(3));
+    const offGap = Math.abs(offA - offB);
 
     /* ⚠ AND ON, IT MUST BE ABLE TO TELL THEM APART — this is the whole feature. Before it,
        `bedShare` was a single scalar and room-need was an independent coin flip, so the patients
        sent to rooms were a random sample and no slower than anyone else. Any routing rule was
        provably useless, which was mistaken for a finding about the department. */
     const onSlow = go(slow, true).score, onFast = go(fast, true).score;
+    const onGap = onFast - onSlow;
+    console.log("the complaint table adds composition sensitivity, not just volume:",
+      onGap > 2 * offGap && onGap > 0.30
+        ? "yes (composition worth " + onGap.toFixed(2) + " min against " + offGap.toFixed(2)
+          + " from volume alone)"
+        : "FAIL — on-gap " + onGap.toFixed(3) + " vs off-gap " + offGap.toFixed(3));
     console.log("with it on, sending the SLOW complaints to rooms beats the fast ones:",
-      onSlow < onFast - 0.02
+      onSlow < onFast - 0.30
         ? "yes (slow " + onSlow.toFixed(3) + " vs fast " + onFast.toFixed(3)
           + "; off they were " + offA.toFixed(3) + " / " + offB.toFixed(3) + ")"
         : "FAIL — slow " + onSlow.toFixed(3) + " vs fast " + onFast.toFixed(3)
