@@ -55,7 +55,7 @@ function sim(cfg){
      which docQueue() accumulates independently. Without that cross-check the counter is
      self-referential — forcing lastQ to 0 makes both the floor and the violation count
      agree on nothing happening, and a mutation doing exactly that passed. */
-  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge, loadBeta = 0,
+  const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge, loadBeta = 0, loadRef = 0,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0,
          ccMix=null, hourMulT=null, hourMulN=null, tot=null} = cfg;
@@ -187,10 +187,22 @@ function sim(cfg){
          post-doctor share before the modelled queue is added back; otherwise the wait is counted
          twice. `docs = 0` skips all of it and the engine is exactly as it was. */
       const docFree = new Array(docs).fill(0);
+      /* ⚠ EACH DOCTOR'S OWN PANEL, DEFINED AS THE MEASUREMENT DEFINES IT. `docHeld[i]` holds the
+         DEPARTURE times of patients doctor i has already reached and not yet dispositioned. It is
+         NOT `inLane`: that counts everyone occupying a space, including patients still queued for
+         a doctor, which ran a median of 6 against the real pod's 2.6 (2026-08-25). Applying the
+         measured coefficient to that inflated count multiplied everyone's stay by 1.39x where the
+         department manages 1.12x, and since the occupancy curves were measured at the department's
+         own load they ALREADY contain the average — so the surplus was counted twice, and it
+         collapsed the per-complaint table's composition signal. Prune-then-count is O(panel) and
+         panel is single digits. */
+      const docHeld = docs ? Array.from({length: docs}, () => []) : null;
+      let lastDoc = 0, lastStart = 0;
       const docQueue = t => {
         if(!docs) return 0;
         let i = 0; for(let j = 1; j < docFree.length; j++) if(docFree[j] < docFree[i]) i = j;
         const start = Math.max(t, docFree[i]);
+        lastDoc = i; lastStart = start;
         /* ⚠ VARIABLE, NOT FIXED. docMin is inverted from the observed queue by M/M/1, which
            assumes exponential service — implement it as a CONSTANT and you get M/D/1, whose wait
            is exactly HALF for the same mean. The guard caught precisely that factor of two (8.4
@@ -216,9 +228,15 @@ function sim(cfg){
       const holdOf = (t, w, raw) => {
         const q = docs ? docQueue(t) : 0;
         lastQ = q;
-        const own = loadBeta && !w && docs
-          ? Math.pow(1 + loadBeta, Math.max(0, inLane - 1) / docs) : 1;
+        let own = 1;
+        if(docs){
+          const held = docHeld[lastDoc];
+          let k = 0; for(let j = 0; j < held.length; j++) if(held[j] > lastStart) held[k++] = held[j];
+          held.length = k;               // everyone this doctor still has open at first contact
+          if(loadBeta && !w) own = Math.pow(1 + loadBeta, k - loadRef);
+        }
         const v = docs ? q + raw * ((postShare && postShare[w ? 1 : 0]) ?? 0.8) * own : raw;
+        if(docs) docHeld[lastDoc].push(t + v);
         hSum += v; hN++;                 // exposed so the no-double-count property is testable
         return v; };
       /* ⚠ THE PROCESS FLOOR IS TWO PARTS. `floor` is arrival -> triage; `floorRoom` is triage ->
@@ -539,7 +557,7 @@ function buildTrace(){
                    bit-identical at every setting of a dial worth ~5 score points — a lane the
                    score has jamming played as one emptying. The fingerprint guard could not see
                    it: it identifies MODES, and these are numeric parameters. */
-                docs:S.docs, docMin:D.doc_min ?? 18, loadBeta:S.loadBeta ?? 0, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
+                docs:S.docs, docMin:D.doc_min ?? 18, loadBeta:S.loadBeta ?? 0, loadRef:D.doc_load_ref ?? 0, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
                 hourMulT: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.test[(S.start+i)%24]) : null,
                 hourMulN: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.notest[(S.start+i)%24]) : null,
                 floorRoom: S.docs ? (D.floor_room ?? 0) : 0,
@@ -956,7 +974,7 @@ function evaluate(cfg, dayTotal){
               Indexed by lane-hour offset like `load`, and mean 1 over a 24h lane by construction,
               so this adds SHAPE across the day and never moves the all-day aggregate. */
            hourMulT: _hmT, hourMulN: _hmN,
-           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, loadBeta: cfg.loadBeta ?? 0, postShare: D.postdoc_share,
+           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, loadBeta: cfg.loadBeta ?? 0, loadRef: D.doc_load_ref ?? 0, postShare: D.postdoc_share,
            tot: D.tot ? scale(D.tot, f*w("t")/NTOT) : null,
            asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
            res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
