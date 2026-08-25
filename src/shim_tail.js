@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 126;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 127;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1983,7 +1983,25 @@ setTimeout(async ()=>{ try{
     _log("FAIL — harness ABORTED after \"" + LAST + "\": " + err.message);
     _log(err.stack ? err.stack.split("\n").slice(0,3).join("\n") : "");
   }finally{
+  /* ⚠ THE FROZEN-FIGURE GUARD. This hint used to read "not one patient in 746 was seated with
+     every chair full" — a hand-counted denominator that stayed 746 while the pod era grew to
+     916, AND a claim about a chair count nobody has measured (the busiest moment observed is a
+     LOWER BOUND on capacity, not capacity). Nothing caught either, because prose is not checked.
+     So this asserts the sentence carries the values sim actually holds, and mutating pod_seat
+     must break it. Do NOT weaken it to "contains a number" — that passes on a frozen one. */
+  { drawTurn();
+    const h = [...document.getElementById("turnCtl").innerHTML.matchAll(
+                 /A space is not care[\s\S]*?<\/div>/g)].map(m=>m[0]).join("");
+    const live = h.includes(">" + D.pod_seat.med + "<") && h.includes(">" + D.pod_seat.peak + "<");
+    console.log("pod hint carries live seating, not a frozen count:",
+      (live && !/\b746\b/.test(h) && h.length > 100) ? "yes (median " + D.pod_seat.med
+        + ", peak " + D.pod_seat.peak + " both in the sentence)"
+        : "FAIL — hint does not carry pod_seat med=" + D.pod_seat.med + " peak="
+          + D.pod_seat.peak + "; got: " + h.slice(0, 400)); }
+
     _log("--- " + CHECKS + " checks ran ---");
+
+
     if(CHECKS < EXPECTED_CHECKS)
       _log("FAIL — only " + CHECKS + " of " + EXPECTED_CHECKS + " checks ran; the rest never executed");
   }

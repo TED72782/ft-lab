@@ -170,8 +170,11 @@ function sim(cfg){
       const hb = t => Math.min(H-1, (t/60)|0);
       /* ── THE PROVIDER QUEUE ────────────────────────────────────────────────────────────────
          A space is not care. Taking a chair puts a patient in line for a PERSON, and that line is
-         what the department's wait is actually made of: 0 of 746 patients in the current pod era
-         were seated with every chair full, yet the median one waited 22 min for a space and 8 more
+         what the department's wait is actually made of: patients are seated into a median of 4
+         others against a busiest-ever 14 (D.pod_seat, recomputed every refresh — this used to
+         read "0 of 746 seated with every chair full", which froze its denominator while the pod
+         era grew to 916 AND asserted a chair count nobody has: the peak observed is a lower bound
+         on capacity, not capacity). Yet the median patient waited 22 min for a space and 8 more
          to be seen. What predicts being seen late is how many were roomed AHEAD of you (+9.9% per
          patient in the previous 30 min, t=3.5); the standing lane occupancy does nothing (+1.7%,
          t=0.48); and patients roomed AFTER you carry -8.6% (t=-2.8), so being early in a burst
@@ -208,8 +211,11 @@ function sim(cfg){
       /* ⚠ THE PROCESS FLOOR IS TWO PARTS. `floor` is arrival -> triage; `floorRoom` is triage ->
          actually being put in a space, a median 13 min here that the engine had no
          representation for at all — which is most of why it predicted 8 minutes to be roomed
-         where the department measures 22. It is process and not queueing: not one pod patient in
-         746 was seated with every chair full, so none of it is waiting for a chair. It is
+         where the department measures 22. It is process and not queueing: a pod patient is seated
+         into a median of 4 others against a busiest-ever 14 (D.pod_seat), so it is not waiting
+         for a chair. ⚠ That peak is a lower BOUND on capacity, not capacity — the earlier
+         phrasing here, "not one patient in 746 seated with every chair full", asserted a chair
+         count nobody has measured and froze a denominator that is now 916. It is
          anchored undelayed and scaled by the crowding multiplier because it demonstrably responds
          to how full the department is (8 min at 0-9 patients present, 12 at 10-19, 18.5 at
          20-29) — a different interval from the queue that multiplier already lengthens, so the
@@ -1330,9 +1336,11 @@ function drawTurn(){
          of being taken on, so the wait rises and the load falls. That trade is the point.
          <span id="cpdEff"></span></div>
        <div class="hint"><b>A space is not care.</b> Taking a chair puts a patient in line for a
-         person, and that line is most of what they wait: in the current pod <b>not one patient in
-         746</b> was seated with every chair full, yet the middle one still waited
-         <b>{{docqm}} minutes</b> to be seen. What predicts being seen late is how many were roomed
+         person, and that line is most of what they wait: in the current pod a patient is seated
+         into a median of <b>${D.pod_seat ? D.pod_seat.med : "a few"}</b> others against a
+         busiest-ever <b>${D.pod_seat ? D.pod_seat.peak : "?"}</b>, so the chairs are rarely the
+         constraint &mdash; yet the middle patient still waited <b>{{docqm}} minutes</b> to be
+         seen. What predicts being seen late is how many were roomed
          <i>ahead</i> of you; how full the lane is predicts nothing. Each provider is modelled at
          <b>{{docmin}} minutes</b> a patient, worked back from that queue rather than assumed.
          <b>0 removes the queue</b> and scores spaces alone, as this page did before.</div>
