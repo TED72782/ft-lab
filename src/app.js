@@ -557,7 +557,7 @@ function buildTrace(){
                    bit-identical at every setting of a dial worth ~5 score points — a lane the
                    score has jamming played as one emptying. The fingerprint guard could not see
                    it: it identifies MODES, and these are numeric parameters. */
-                docs:S.docs, docMin:D.doc_min ?? 18, loadBeta:S.loadBeta ?? 0, loadRef:D.doc_load_ref ?? 0, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
+                docs:S.docs, docMin:D.doc_min ?? 18, loadBeta:S.loadBeta ?? D.doc_load_beta ?? 0, loadRef:D.doc_load_ref ?? 0, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
                 hourMulT: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.test[(S.start+i)%24]) : null,
                 hourMulN: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.notest[(S.start+i)%24]) : null,
                 floorRoom: S.docs ? (D.floor_room ?? 0) : 0,
@@ -974,7 +974,7 @@ function evaluate(cfg, dayTotal){
               Indexed by lane-hour offset like `load`, and mean 1 over a 24h lane by construction,
               so this adds SHAPE across the day and never moves the all-day aggregate. */
            hourMulT: _hmT, hourMulN: _hmN,
-           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, loadBeta: cfg.loadBeta ?? 0, loadRef: D.doc_load_ref ?? 0, postShare: D.postdoc_share,
+           load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, loadBeta: cfg.loadBeta ?? D.doc_load_beta ?? 0, loadRef: D.doc_load_ref ?? 0, postShare: D.postdoc_share,
            tot: D.tot ? scale(D.tot, f*w("t")/NTOT) : null,
            asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
            res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});

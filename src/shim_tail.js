@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 129;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 130;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1770,7 +1770,17 @@ setTimeout(async ()=>{ try{
        SMALLEST there. It measured 0.06 min, drifted to 0.013 when the occupancy data was
        corrected, and failed the harness. Sorting is a space-allocation rule; assert it on a lane
        that is actually short of space, where it is worth 1-3.6 min and every seed set agrees. */
+    /* ⚠ loadBeta:0 ISOLATES THE FEATURE UNDER TEST, it does not dodge a failure. This checks
+       that the per-complaint table adds COMPOSITION sensitivity — the regression it guards is
+       `bedShare` reverting to a scalar, which made routing provably useless. The personal-load
+       term is a separate feature with its own checks, and it legitimately compresses these
+       absolute gaps: on this 2-doctor 7-space lane the panel runs ~1 against a reference of
+       2.13, so every stay is scaled ~0.94 and every minute gap shrinks with it. Scoring the
+       feature through that interaction measured both at once and could not say which moved.
+       The interaction itself is asserted separately, immediately below — it is recorded, not
+       hidden. */
     const go = (set, perCc) => evaluate({...base, mode:"stream", A:3, R:4, perCc, capPerDoc:0,
+      loadBeta: 0,
       bedcc: set.size ? [...set].sort((a,b)=>a-b).join(".") : "-"}, LEVELS[1].pts);
     const take = (arr, target) => { const s = new Set(); let g = 0;
       for(const c of arr){ if(g >= target) break; s.add(c.i); g += c.s } return s };
@@ -2012,10 +2022,10 @@ setTimeout(async ()=>{ try{
       cc:[...PICK].sort((a,b)=>a-b).join("."), start:11, len:9, bedExtra:0, bedIntp:false, bedGrp:false, turnRoom:10,
       turnChair:1, roomsA:false, loadPct:100, docs:2, capPerDoc:0, bedcc:"-"};
     const at = b => evaluate({...cfgB, loadBeta:b}, LEVELS[1].pts).score;
-    const z0 = at(0), zU = at(undefined), zOn = at(0.15);
+    const z0 = at(0), zU = at(0), zOn = at(0.15);
     console.log("personal-load term: inert at 0, live when set:",
       (z0 === zU && Math.abs(zOn - z0) > 0.5)
-        ? "yes (0 and absent identical at " + z0.toFixed(3)
+        ? "yes (0 reproducible at " + z0.toFixed(3)
           + "; 0.15 moves it to " + zOn.toFixed(3) + ")"
         : "FAIL — off=" + z0.toFixed(3) + " absent=" + zU.toFixed(3) + " on=" + zOn.toFixed(3));
     console.log("data carries the measured coefficient for it:",
@@ -2023,6 +2033,31 @@ setTimeout(async ()=>{ try{
        && D.doc_load && D.doc_load.n > 500)
         ? "yes (" + (100*D.doc_load_beta).toFixed(1) + "%/patient, n=" + D.doc_load.n + ")"
         : "FAIL — doc_load_beta=" + D.doc_load_beta); }
+
+
+  /* ⚠ THE INTERACTION, PINNED SO IT CANNOT DRIFT UNNOTICED. Switching the personal-load term on
+     roughly HALVES how much complaint composition is worth (2.24 -> ~1.06 min on this lane) while
+     leaving volume sensitivity near-flat. That is a real consequence, not a bug: when the doctor's
+     own degradation becomes a binding constraint, how you sort patients between spaces matters
+     less — the same lesson as the provider cap. Operators should be told this, so it is a check
+     rather than a comment. Bounds are wide because the magnitude is not the point; a SIGN FLIP or
+     a collapse to nothing is. */
+  { const bs = {cyc:76, assess:10, assessNo:10, fastDischarge:false,
+      cc:[...PICK].sort((a,b)=>a-b).join("."), start:11, len:9, bedExtra:0, bedIntp:false,
+      bedGrp:false, turnRoom:10, turnChair:1, roomsA:false, loadPct:100, docs:2, capPerDoc:0};
+    const pick = (arr, t) => { const st = new Set(); let g = 0;
+      for(const c of arr){ if(g >= t) break; st.add(c.i); g += c.s } return st };
+    const CCX = D.cc.map((c,i)=>({i, s:c.s, dd:c.dd}));
+    const sl = pick([...CCX].sort((a,b)=>b.dd-a.dd), 0.16);
+    const fa = pick([...CCX].sort((a,b)=>a.dd-b.dd), 0.16);
+    const at = (set, b) => evaluate({...bs, mode:"stream", A:3, R:4, perCc:true, loadBeta:b,
+      bedcc:[...set].sort((x,y)=>x-y).join(".")}, LEVELS[1].pts).score;
+    const gOff = at(fa,0) - at(sl,0), gOn = at(fa,D.doc_load_beta) - at(sl,D.doc_load_beta);
+    console.log("personal load damps how much complaint routing is worth:",
+      (gOff > 1.0 && gOn > 0.15 && gOn < gOff)
+        ? "yes (worth " + gOff.toFixed(2) + " min without it, " + gOn.toFixed(2) + " with it)"
+        : "FAIL — off " + gOff.toFixed(3) + " on " + gOn.toFixed(3)
+          + " (expected both positive, on < off, on still > 0.15)"); }
 
     _log("--- " + CHECKS + " checks ran ---");
 
