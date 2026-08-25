@@ -24,7 +24,7 @@ Heap.prototype.pop=function(){const a=this.a,top=a[0],last=a.pop();if(a.length){
 
    `fastDischarge=false` is the exception the data forces us to offer. A patient who needs no test
    has no order to time from, and may simply not be movable; then they hold the assessment space
-   for their whole visit — D.g.now measured, LONGER than the D.g.asw - D.pom measured to a test patient's
+   for their whole visit — D.g.now measured, LONGER than a test patient's own first order (a
    first order (72 with the assumed 25 after it).
 
    People waiting to be seen queue in the main waiting room, not in either area, so a queue can
@@ -1255,9 +1255,8 @@ function fdControl(){
       <button type="button" data-fd="1" aria-pressed="${S.fastDischarge}">moves on once seen</button>
     </div>
     <div class="hint">Half of these patients get no test, so nothing in the record marks when they
-      are finished being assessed. Keeping the space is what we measure today — ${D.g.now.toFixed(0)}
-      minutes, longer than a test patient's ${(D.g.asw-D.pom).toFixed(0)} measured to first order
-      (${D.g.asw.toFixed(0)} with the assumed ${D.pom} after it).</div></div>`;
+      are finished being assessed. Keeping the space is what we measure today &mdash;
+      ${D.g.now.toFixed(0)} minutes.</div></div>`;
   /* ⚠ There used to be a second slider here, "They move on after". It wrote the SAME S.assess
      as the one above — one number with two handles, and two different ranges (12-86 against
      10-90), so the controls disagreed about their own limits. The engine has a single
@@ -1453,11 +1452,11 @@ function drawSpeed(m){
       <output class="num" id="asxOut"></output></div>
     <input type="range" id="asx" min="10" max="90" step="1" value="${S.assess}">
     <div class="hint">How long a patient keeps an assessment space before moving to the second
-      area. Measured today, a test patient's first order lands
-      ${(D.g.asw-D.pom).toFixed(0)} min after rooming; the ${D.g.asw.toFixed(0)}-min reference
-      adds an <b>assumed</b> ${D.pom} min after the order. Neither is a decision anyone made, and
-      neither exists at all for the half who need no test. It is the number to argue about: the
-      best split follows it.
+      area. <b>Nothing in the record marks it.</b> What is recorded is either side of it: the
+      doctor arrives about ${D.band ? D.band.doc.toFixed(0) : "20"} min after rooming, and the
+      decision is entered about ${D.band ? D.band.dispo.toFixed(0) : "60"}. Assessment finishes
+      somewhere between the two, so this is a number to argue about rather than look up &mdash;
+      and the best split follows whatever you set.
       <span id="asxBoth"></span></div></div>`
     /* The no-test half is its own control, and only where it can bite: it does nothing unless
        patients actually move on, so it is drawn under the fastDischarge toggle rather than beside
