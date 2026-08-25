@@ -48,7 +48,7 @@ function sim(cfg){
   const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0,
-         ccMix=null, hourMulT=null, hourMulN=null} = cfg;
+         ccMix=null, hourMulT=null, hourMulN=null, tot=null} = cfg;
   /* ⚠ HOW MANY PATIENTS ONE PROVIDER WILL HOLD AT ONCE — a POLICY ceiling, like the acuity
      ratios, not a measured quantity. `ab+rb` is every patient occupying a space and the engine
      already calls that "the physician's concurrent load"; this refuses to seat past
@@ -216,7 +216,8 @@ function sim(cfg){
            explicitly, so scaling here was double-counting. It moved to docMin above. */
         const _hm = w ? (hourMulT ? hourMulT[hb(arr[tag])] : 1)
                       : (hourMulN ? hourMulN[hb(arr[tag])] : 1);
-        const total = holdOf(t, w, (w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
+        const total = holdOf(t, w, (w ? (tot ? pick(r,tot)*(C?C.mt:1)
+                                            : pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1))
                                       : pick(r,now)*(C?C.mo:1)) * _hm);
         if(pooled){ second[tag]=0; ev.push([t+total,1,tag]); return }
         if(!w && !fastDischarge){ second[tag]=0; ev.push([t+total,1,tag]); return }
@@ -292,7 +293,8 @@ function sim(cfg){
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
         const _hm = w ? (hourMulT ? hourMulT[hb(arr[tag])] : 1)
                       : (hourMulN ? hourMulN[hb(arr[tag])] : 1);
-        return holdOf(t, w, (w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
+        return holdOf(t, w, (w ? (tot ? pick(r,tot)*(C?C.mt:1)
+                                     : pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1))
                                : pick(r,now)*(C?C.mo:1)) * _hm) };
       const startBed = (t,tag) => { ab++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
@@ -505,6 +507,7 @@ function buildTrace(){
                   : null,
                 assessNo:S.assessNo * mx.fm,
                 fastDischarge:S.fastDischarge, shr:mx.shr, lam,
+                tot: D.tot ? scale(D.tot, f*mx.nt) : null,
                 asw:scale(D.asw, f*mx.na), now:scale(D.now, f*mx.no), res:scale(D.res, f*mx.nr),
                 days:1, trace:true};
 
@@ -764,7 +767,8 @@ const bar = () => BARS[S.bar] || BARS.today;
    the means of the CURVES the engine draws. They differ once a curve is rescaled, and dividing a
    rescaled curve by an un-rescaled anchor silently breaks the a+r partition — see the pipeline.
    Scaling uses norm; the sizing banner uses fa/fr against the anchors and must keep doing so. */
-const NASW = (D.norm && D.norm.asw) || D.g.asw,
+const NTOT = (D.norm && D.norm.tot) || ((D.g.asw||0) + (D.g.res||0)),
+      NASW = (D.norm && D.norm.asw) || D.g.asw,
       NRES = (D.norm && D.norm.res) || D.g.res,
       NNOW = (D.norm && D.norm.now) || D.g.now;
 function mix(){
@@ -776,6 +780,7 @@ function mix(){
           shr: wsum("w"),
           fa: wsum("a")/D.g.asw,                    // scale factors onto the shared shapes
           na: wsum("a")/NASW, nr: wsum("r")/NRES, no: wsum("o")/NNOW,   // ...for the CURVES
+          t:  wsum("t"), nt: wsum("t")/NTOT,      // the single test-patient occupancy curve
           fr: wsum("r")/D.g.res,
           fo: wsum("o")/D.g.now,
           fm: D.g.dd ? wsum("dd")/D.g.dd : 1};  // how long this mix's no-test patients hold a doctor
@@ -829,7 +834,7 @@ function evaluate(cfg, dayTotal){
      behind, decomposed exactly as bedShareOf composes it. */
   const _bedKeep = cfg.bedcc === "-" ? new Set()
                  : cfg.bedcc === undefined ? new Set(BED_IDS) : idSet(cfg.bedcc);
-  const _mA = w("a"), _mO = w("o"), _mR = w("r");
+  const _mA = w("a"), _mO = w("o"), _mR = w("r"), _mT = w("t");
   const _xtra = (cfg.bedExtra || 0) / 100;
   let _cum = 0;
   const ccMix = share > 0 ? sel.map(x => {
@@ -837,6 +842,7 @@ function evaluate(cfg, dayTotal){
     const _i = cfg.bedIntp ? (x.x != null ? x.x : D.g.interp) : 0;
     return {p:_cum, w:x.w, bed:_bedKeep.has(x.i) ? 1 : 0,
             res2: _i + (1 - _i) * _xtra,
+            mt:_mT && x.t != null ? x.t/_mT : 1,      // one multiplier on the whole stay
             ma:_mA ? x.a/_mA : 1, mo:_mO ? x.o/_mO : 1, mr:_mR ? x.r/_mR : 1};
   }) : null;
 
@@ -907,6 +913,7 @@ function evaluate(cfg, dayTotal){
               so this adds SHAPE across the day and never moves the all-day aggregate. */
            hourMulT: _hmT, hourMulN: _hmN,
            load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
+           tot: D.tot ? scale(D.tot, f*w("t")/NTOT) : null,
            asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
            res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
 
@@ -2500,8 +2507,8 @@ function run(){
     : mx.shr*S.assess + (1-mx.shr)*D.g.now*mx.fo;
   const perRes = m.id==="pooled" ? 0
     : S.fastDischarge
-      ? mx.shr*(D.g.asw*mx.fa + D.g.res*mx.fr - S.assess) + (1-mx.shr)*Math.max(0, D.g.now*mx.fo - S.assess)
-      : mx.shr*(D.g.asw*mx.fa + D.g.res*mx.fr - S.assess);
+      ? mx.shr*(mx.t - S.assess) + (1-mx.shr)*Math.max(0, D.g.now*mx.fo - S.assess)
+      : mx.shr*(mx.t - S.assess);   // mx.t IS a+r, without needing the split
   /* ⚠ BED-FIRST HAS A DIFFERENT TIGHT SPOT, and reading it as two independent pools would be
      wrong in both directions. Rooms are not a stage every patient passes through — they are the
      preferred pool, so the estate is really ONE pool of A+R with a rule attached. What the rule
