@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 127;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 129;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1998,6 +1998,31 @@ setTimeout(async ()=>{ try{
         + ", peak " + D.pod_seat.peak + " both in the sentence)"
         : "FAIL — hint does not carry pod_seat med=" + D.pod_seat.med + " peak="
           + D.pod_seat.peak + "; got: " + h.slice(0, 400)); }
+
+
+  /* ⚠ THE PERSONAL-LOAD TERM IS MEASURED, WIRED, AND DELIBERATELY OFF. data.json carries
+     doc_load_beta (+5.7%/patient, t=3.69, measured on the fast-track pods) and sim() accepts
+     it, but no call site passes it yet — see CLAUDE.md "Physicians DO slow down". This asserts
+     (1) it is genuinely inert at 0, so the shipped engine is unchanged, and (2) it still WORKS
+     when handed a value, so the mechanism cannot rot silently while the level question is open.
+     Do NOT "fix" this by switching it on: at the measured coefficient it collapses the
+     composition sensitivity the per-complaint table exists to provide, which is a level
+     mismatch (engine panel ~6, real pod ~2.6), not a coding error. */
+  { const cfgB = {mode:"stream", A:3, R:4, cyc:76, assess:10, assessNo:10, fastDischarge:false,
+      cc:[...PICK].sort((a,b)=>a-b).join("."), start:11, len:9, bedExtra:0, bedIntp:false, bedGrp:false, turnRoom:10,
+      turnChair:1, roomsA:false, loadPct:100, docs:2, capPerDoc:0, bedcc:"-"};
+    const at = b => evaluate({...cfgB, loadBeta:b}, LEVELS[1].pts).score;
+    const z0 = at(0), zU = at(undefined), zOn = at(0.15);
+    console.log("personal-load term: inert at 0, live when set:",
+      (z0 === zU && Math.abs(zOn - z0) > 0.5)
+        ? "yes (0 and absent identical at " + z0.toFixed(3)
+          + "; 0.15 moves it to " + zOn.toFixed(3) + ")"
+        : "FAIL — off=" + z0.toFixed(3) + " absent=" + zU.toFixed(3) + " on=" + zOn.toFixed(3));
+    console.log("data carries the measured coefficient for it:",
+      (typeof D.doc_load_beta === "number" && D.doc_load_beta >= 0 && D.doc_load_beta < 0.15
+       && D.doc_load && D.doc_load.n > 500)
+        ? "yes (" + (100*D.doc_load_beta).toFixed(1) + "%/patient, n=" + D.doc_load.n + ")"
+        : "FAIL — doc_load_beta=" + D.doc_load_beta); }
 
     _log("--- " + CHECKS + " checks ran ---");
 
