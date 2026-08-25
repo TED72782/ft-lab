@@ -48,7 +48,7 @@ function sim(cfg){
   const {A, R, lam, asw, now, res, load, docs = 0, docMin = 18, postShare, floorRoom = 0, pooled, bedFirst, bedShare=0, assessMin, fastDischarge,
          bedGrp=false, stream=false, turnA=0, turnB=0, assessNo,  // assessNo: the no-test half
          shr=D.shr, floor=D.floor, days=600, seeds=[11,12,13,14], trace, capPerDoc=0,
-         ccMix=null} = cfg;
+         ccMix=null, hourMulT=null, hourMulN=null} = cfg;
   /* ⚠ HOW MANY PATIENTS ONE PROVIDER WILL HOLD AT ONCE — a POLICY ceiling, like the acuity
      ratios, not a measured quantity. `ab+rb` is every patient occupying a space and the engine
      already calls that "the physician's concurrent load"; this refuses to seat past
@@ -214,8 +214,10 @@ function sim(cfg){
            whole hold +3.68% (t=4.6), queue +15.4% (t=10.6), post-doctor hold +0.49% (t=0.50).
            Department load does not slow CARE at all; it slowed the thing the engine now models
            explicitly, so scaling here was double-counting. It moved to docMin above. */
-        const total = holdOf(t, w, w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
-                                     : pick(r,now)*(C?C.mo:1));
+        const _hm = w ? (hourMulT ? hourMulT[hb(arr[tag])] : 1)
+                      : (hourMulN ? hourMulN[hb(arr[tag])] : 1);
+        const total = holdOf(t, w, (w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
+                                      : pick(r,now)*(C?C.mo:1)) * _hm);
         if(pooled){ second[tag]=0; ev.push([t+total,1,tag]); return }
         if(!w && !fastDischarge){ second[tag]=0; ev.push([t+total,1,tag]); return }
         /* ⚠ THE TWO HALVES ARE ASSESSED SEPARATELY. `assessMin` is measured on patients who HAD
@@ -288,8 +290,10 @@ function sim(cfg){
       const draw = (tag, t) => { const C = CCM(ccOf ? ccOf[tag] : -1);
         const w = r() < (C ? C.w : shr);
         if(T) for(let i=T.length-1;i>=0;i--) if(T[i].id===tag && T[i].ev==="arrive"){ T[i].test=w; break }
-        return holdOf(t, w, w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
-                              : pick(r,now)*(C?C.mo:1)) };
+        const _hm = w ? (hourMulT ? hourMulT[hb(arr[tag])] : 1)
+                      : (hourMulN ? hourMulN[hb(arr[tag])] : 1);
+        return holdOf(t, w, (w ? pick(r,asw)*(C?C.ma:1) + pick(r,res)*(C?C.mr:1)
+                               : pick(r,now)*(C?C.mo:1)) * _hm) };
       const startBed = (t,tag) => { ab++; inLane++; if(inLane>peakIn) peakIn=inLane;
         if(T){ const s=freeA.pop(); slotA[tag]=s; T.push({t, id:tag, ev:"assess", slot:s}) }
         second[tag]=0; ev.push([t+draw(tag,t),1,tag]) };
@@ -490,6 +494,8 @@ function buildTrace(){
                    score has jamming played as one emptying. The fingerprint guard could not see
                    it: it identifies MODES, and these are numeric parameters. */
                 docs:S.docs, docMin:D.doc_min ?? 18, postShare:D.postdoc_share, capPerDoc:S.capPerDoc,
+                hourMulT: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.test[(S.start+i)%24]) : null,
+                hourMulN: D.hour_mul ? Array.from({length:S.len},(_,i)=>D.hour_mul.notest[(S.start+i)%24]) : null,
                 floorRoom: S.docs ? (D.floor_room ?? 0) : 0,
                 load: (D.occ24 && D.load_beta)
                   ? Array.from({length:S.len}, (_,i) => Math.max(1, Math.min(2.2,
@@ -888,6 +894,13 @@ function evaluate(cfg, dayTotal){
               assessMin`, so a cfg without the field worked; multiplying an undefined by the mix
               factor gives NaN, and a NaN reaches the board as a blank score. */
            assessNo: assessNoEff,
+           /* ⚠ HOW LONG A STAY RUNS DEPENDS ON THE HOUR IT STARTS, and it is NOT the crowding
+              dial re-measured — corr(arrivals, occupancy) = -0.502, i.e. the busy hours are the
+              FAST ones, where crowding makes them slow. Opposite mechanisms, so they stack.
+              Indexed by lane-hour offset like `load`, and mean 1 over a 24h lane by construction,
+              so this adds SHAPE across the day and never moves the all-day aggregate. */
+           hourMulT: D.hour_mul ? hours.map(h => D.hour_mul.test[h]) : null,
+           hourMulN: D.hour_mul ? hours.map(h => D.hour_mul.notest[h]) : null,
            load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
            asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
            res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
