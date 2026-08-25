@@ -840,6 +840,12 @@ function evaluate(cfg, dayTotal){
             ma:_mA ? x.a/_mA : 1, mo:_mO ? x.o/_mO : 1, mr:_mR ? x.r/_mR : 1};
   }) : null;
 
+  /* ⚠ BUILT ONCE. These were computed separately for sim() and for the return value, so a
+     mutation breaking the array sim receives left the returned one correct and the guard
+     passed. A check that reads a DUPLICATE of the thing under test is not a check. */
+  const _hmT = D.hour_mul ? hours.map(h => D.hour_mul.test[h]) : null;
+  const _hmN = D.hour_mul ? hours.map(h => D.hour_mul.notest[h]) : null;
+
   const lam = hours.map(h => D.lam24[h] * fac * share);      // what the lane actually sees
   const accepted = lam.reduce((a,b)=>a+b, 0);
   /* Hoisted and returned so the WIRING can be asserted. `mix().fm` is the same expression, but it
@@ -899,8 +905,7 @@ function evaluate(cfg, dayTotal){
               FAST ones, where crowding makes them slow. Opposite mechanisms, so they stack.
               Indexed by lane-hour offset like `load`, and mean 1 over a 24h lane by construction,
               so this adds SHAPE across the day and never moves the all-day aggregate. */
-           hourMulT: D.hour_mul ? hours.map(h => D.hour_mul.test[h]) : null,
-           hourMulN: D.hour_mul ? hours.map(h => D.hour_mul.notest[h]) : null,
+           hourMulT: _hmT, hourMulN: _hmN,
            load, floorRoom: (cfg.docs ?? 1) ? (D.floor_room ?? 0) : 0, docs: cfg.docs ?? 1, docMin: D.doc_min ?? 18, postShare: D.postdoc_share,
            asw:scale(D.asw, f*w("a")/NASW), now:scale(D.now, f*w("o")/NNOW),
            res:scale(D.res, f*w("r")/NRES), days:cfg.days||600, seeds:cfg.seeds||[11,12,13,14]});
@@ -919,7 +924,13 @@ function evaluate(cfg, dayTotal){
   const laneMin = o.idle ? 0 : o.perArrival * accepted;
   const score = dayTotal ? (laneMin + divMin + outMin) / dayTotal : B.mean;
 
-  return {o, m, hours, accepted, share, dayTotal, score, assessNoEff, load, base:B.mean, delta:B.mean-score,
+  /* hourMul returned for the same reason `load` is: a guard must be able to read the array the
+     engine was actually handed. Asserting the hour shape through a SIMULATED outcome instead
+     compares windows with different arrival volumes, and the sampling noise swamps it — a
+     mutation indexing by lane offset rather than clock hour passed that way. */
+  return {o, m, hours, accepted, share, dayTotal, score, assessNoEff, load,
+          hourMul: _hmT,
+          base:B.mean, delta:B.mean-score,
           cover: dayTotal ? accepted/dayTotal : 0};
 }
 

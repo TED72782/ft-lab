@@ -7,7 +7,7 @@ const DEFAULT_ASSESS_NO = S.assessNo;
    exit code did go to 1, but the first stderr line is an innocuous ?board= notice, so it looked
    normal. Now a throw prints a FAIL naming the check it died after, and the run always ends with
    a count line — an absent or shrunken count is itself the signal. */
-const EXPECTED_CHECKS = 119;   // raise DELIBERATELY when adding a check
+const EXPECTED_CHECKS = 123;   // raise DELIBERATELY when adding a check
 let CHECKS = 0, LAST = "(none)";
 const _log = console.log.bind(console);
 console.log = (...a) => { const t = String(a[0] ?? "");
@@ -1816,6 +1816,81 @@ setTimeout(async ()=>{ try{
         ? "yes (hold " + a.holdMean.toFixed(1) + " -> " + b.holdMean.toFixed(1)
           + ", " + (100*drift).toFixed(1) + "%)"
         : "FAIL — hold moved " + (100*drift).toFixed(1) + "%, far past the ~1% correlation bias");
+  }
+
+
+  /* ── the hour shape (2026-08-24) ──────────────────────────────────────────────────────── */
+  {
+    const ALLCC = CC.map(x=>x.i).sort((a,b)=>a-b).join(".");
+    const occ = (start, len, on) => {
+      const save = D.hour_mul; if(!on) D.hour_mul = null;
+      const E = evaluate({mode:"pooled", A:40, R:0, cyc:76, assess:44, assessNo:44,
+        fastDischarge:false, cc:ALLCC, start, len, bedcc:"-", bedExtra:0, bedIntp:false,
+        bedGrp:false, turnRoom:0, turnChair:0, roomsA:false, loadPct:0, docs:0, capPerDoc:0,
+        perCc:true}, LEVELS[1].pts);
+      D.hour_mul = save; return E.o.holdMean;
+    };
+    /* ⚠ A LANE OPEN AROUND THE CLOCK MUST BE UNCHANGED. The factors are normalised to
+       volume-weighted mean 1, so this adds SHAPE across the day and never moves the all-day
+       aggregate. If this drifts, the normalisation has broken and every published number moved
+       with it. */
+    const a24 = occ(0,24,false), b24 = occ(0,24,true);
+    console.log("the hour shape is neutral over a whole day:",
+      Math.abs(b24-a24) < 0.6
+        ? "yes (24h lane " + a24.toFixed(1) + " -> " + b24.toFixed(1) + ")"
+        : "FAIL — a 24h lane moved " + (b24-a24).toFixed(2) + " min, so mean-1 has broken");
+
+    /* AND IT MUST BITE ON A WINDOW. Measured: occupancy runs 124 min at 20:00 against 168 at
+       midnight, so an overnight lane holds spaces materially longer than an evening one. Before
+       this, both got the same flat curve — the limitation the operator asked to close. */
+    const evE = occ(15,8,true), ovE = occ(22,8,true);
+    const evF = occ(15,8,false), ovF = occ(22,8,false);
+    console.log("an overnight lane now models longer than an evening one:",
+      (ovE - evE) > 3 && Math.abs(ovF - evF) < 1
+        ? "yes (overnight " + ovE.toFixed(1) + " vs evening " + evE.toFixed(1)
+          + "; on the flat curve they were " + ovF.toFixed(1) + " / " + evF.toFixed(1) + ")"
+        : "FAIL — hour-aware gap " + (ovE-evE).toFixed(2) + ", flat gap " + (ovF-evF).toFixed(2));
+
+    /* ⚠ AND IT MUST USE THE CLOCK HOUR, NOT THE LANE OFFSET. Indexing the factors by position
+       in the window instead of by wall-clock hour still produces an overnight-vs-evening gap
+       (for unrelated reasons) so the check above cannot see it. Open the lane for two hours at
+       the SLOWEST hour and again at the FASTEST, and require the modelled occupancy to order the
+       way the published factors say. Index by offset and both windows read the same factors, so
+       the gap collapses. */
+    {
+      /* read the array the engine was HANDED, not a simulated outcome. The outcome version of
+         this compared a 23:00 window against a 20:00 one, which differ fivefold in arrivals, and
+         the sampling noise let a lane-offset mutation through. */
+      const mt = D.hour_mul.test;
+      const E = evaluate({mode:"pooled", A:40, R:0, cyc:76, assess:44, assessNo:44,
+        fastDischarge:false, cc:CC.map(x=>x.i).sort((a,b)=>a-b).join("."), start:21, len:5,
+        bedcc:"-", bedExtra:0, bedIntp:false, bedGrp:false, turnRoom:0, turnChair:0,
+        roomsA:false, loadPct:0, docs:0, capPerDoc:0, perCc:true}, LEVELS[1].pts);
+      const want = [21,22,23,0,1].map(h => mt[h]);
+      const got  = E.hourMul || [];
+      const same = got.length === want.length && want.every((v,i) => Math.abs(v-got[i]) < 1e-9);
+      console.log("the shape is read at the CLOCK hour, not the lane offset:",
+        same ? "yes (a 21:00 lane is handed the factors for 21,22,23,00,01 — "
+               + want.map(v=>v.toFixed(2)).join(" ") + ")"
+             : "FAIL — 21:00 lane handed [" + got.map(v=>(+v).toFixed(2)).join(" ")
+               + "] but hours 21,22,23,00,01 are [" + want.map(v=>v.toFixed(2)).join(" ") + "]");
+    }
+
+    /* ⚠ IT MUST NOT BE THE CROWDING DIAL WEARING A DIFFERENT LABEL. The two run in OPPOSITE
+       directions — corr(arrivals in an hour, occupancy in that hour) = -0.502, so the busiest
+       hours are the FASTEST, while `load` makes busy hours slower. Assert the shape is not
+       simply tracking arrival volume, which is what would make them the same mechanism. */
+    const hrs = Array.from({length:24},(_,h)=>h);
+    const mul = hrs.map(h => D.hour_mul.test[h]), vol = hrs.map(h => D.lam24[h]);
+    const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
+    const mm = mean(mul), mv = mean(vol);
+    const r = hrs.reduce((s,h)=>s+(mul[h]-mm)*(vol[h]-mv),0) /
+      Math.sqrt(hrs.reduce((s,h)=>s+(mul[h]-mm)**2,0) * hrs.reduce((s,h)=>s+(vol[h]-mv)**2,0));
+    console.log("the hour shape is not the crowding dial re-measured:",
+      r < -0.15
+        ? "yes (corr with arrivals " + r.toFixed(2) + " — busy hours are the FAST ones, the "
+          + "opposite of what crowding does)"
+        : "FAIL — corr with arrivals " + r.toFixed(2) + ", so it may be tracking load");
   }
 
   location.hash = ""; S.mode="split"; S.A=6; S.R=4; S.start=15; S.len=8; saveLocal([]);
